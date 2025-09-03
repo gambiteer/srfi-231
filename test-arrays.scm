@@ -39,9 +39,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 (begin
   ;; To run test-arrays.scm as an R7RS module in Gambit,
   ;; take the following steps:
-  ;; 1. Put generic-arrays.scm and 231.sld in new directory ./srfi/231.
+  ;; 1. Put generic-arrays.scm and 231.sld in new directory ./srfi/231-bis.
   ;; 2. Uncomment this "begin".
-  ;; 2 bis. If you want to compile the library do "gsc . srfi/231".
+  ;; 2 bis. If you want to compile the library do "gsc . srfi/231-bis".
   ;; 3. Run "gsi . test-arrays".
 
   (import (srfi 231-bis))
