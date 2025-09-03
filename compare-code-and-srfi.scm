@@ -40,7 +40,7 @@
 (set! code-names (append other-names code-names))
 
 (define sld-names
-  (with-input-from-file "231.sld"
+  (with-input-from-file "231-bis.sld"
     (lambda ()
       (let* ((sld (read))
              (exports (cdaddr sld)))

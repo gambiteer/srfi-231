@@ -39,7 +39,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (begin
   ;; To run test-arrays.scm as an R7RS module in Gambit,
   ;; take the following steps:
-  ;; 1. Put generic-arrays.scm and 231.sld in new directory ./srfi/231-bis.
+  ;; 1. Put generic-arrays.scm and 231-bis.sld in new directory ./srfi/231-bis.
   ;; 2. Uncomment this "begin".
   ;; 2 bis. If you want to compile the library do "gsc . srfi/231-bis".
   ;; 3. Run "gsi . test-arrays".
@@ -50,13 +50,11 @@ OTHER DEALINGS IN THE SOFTWARE.
    ("srfi/231-bis#"
     ;; Internal SRFI 231 procedures that are either tested or called here.
     %%compose-indexers
-    %%every
     %%interval->basic-indexer
     %%interval-lower-bounds
     %%interval-upper-bounds
     %%move-array-elements
     %%permutation-invert
-    %%vector-every
     %%vector-permute
     %%vector-permute->list
     %%order-unknown
@@ -559,8 +557,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (list->vector upper1))
                             (make-interval (list->vector lower2)
                                            (list->vector upper2)))
-          (and (%%every (lambda (x) (>= (car x) (cdr x))) (map cons lower1 lower2))
-               (%%every (lambda (x) (<= (car x) (cdr x))) (map cons upper1 upper2))))))
+          (and (every (lambda (x) (>= (car x) (cdr x))) (map cons lower1 lower2))
+               (every (lambda (x) (<= (car x) (cdr x))) (map cons upper1 upper2))))))
 
 (pp "interval-empty? tests")
 
@@ -1551,7 +1549,7 @@ OTHER DEALINGS IN THE SOFTWARE.
           (array-reverse base reversed-dimensions)))
     (test (array-packed? reversed)
           (or (array-empty? reversed)
-              (%%vector-every
+              (vector-every
                (lambda (lower upper reversed)
                  (or (= (+ 1 lower) upper)  ;; side-length 1
                      (not reversed)))       ;; dimension not reversed
@@ -1873,13 +1871,13 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                   "Block copy")
                                                  ((eq? destination-storage-class generic-storage-class)
                                                   "In order, no checks needed, generic storage-class")
-                                                 ((%%every destination-checker (cdr (assq source-storage-class extreme-values-alist)))
+                                                 ((every destination-checker (cdr (assq source-storage-class extreme-values-alist)))
                                                   "In order, no checks needed")
                                                  (else
                                                   "In order, checks needed"))
                                            (cond ((eq? destination-storage-class generic-storage-class)
                                                   "Out of order, no checks")
-                                                 ((%%every destination-checker (cdr (assq source-storage-class extreme-values-alist)))
+                                                 ((every destination-checker (cdr (assq source-storage-class extreme-values-alist)))
                                                   "Out of order, no checks")
                                                  (else
                                                   "Out of order, checks"))))
@@ -3404,7 +3402,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                  (car lowers)
                                  lowers))))
     ;; (pp (list args new-lowers new-uppers (vector-every < new-lowers new-uppers)))
-    (and (%%vector-every <= new-lowers new-uppers)
+    (and (vector-every <= new-lowers new-uppers)
          (make-interval new-lowers new-uppers))))
 
 
