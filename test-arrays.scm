@@ -32,11 +32,11 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; A test program for SRFI 231:
 ;;; Intervals and Generalized Arrays
 
-(begin
+'(begin
   ;; Uncomment this line to run test-arrays.scm in Gambit.
   (include "generic-arrays.scm"))
 
-'(begin
+(begin
   ;; To run test-arrays.scm as an R7RS module in Gambit,
   ;; take the following steps:
   ;; 1. Put generic-arrays.scm and 231.sld in new directory ./srfi/231.
@@ -44,10 +44,10 @@ OTHER DEALINGS IN THE SOFTWARE.
   ;; 2 bis. If you want to compile the library do "gsc . srfi/231".
   ;; 3. Run "gsi . test-arrays".
 
-  (import (srfi 231))
+  (import (srfi 231-bis))
 
   (##namespace
-   ("srfi/231#"
+   ("srfi/231-bis#"
     ;; Internal SRFI 231 procedures that are either tested or called here.
     %%compose-indexers
     %%every
@@ -918,22 +918,6 @@ OTHER DEALINGS IN THE SOFTWARE.
       (test (array-domain array)
             domain))))
 
-(pp "array-freeze! tests")
-
-(test (array-freeze! 'a)
-      "array-freeze!: The argument is not an array: ")
-
-(let ((A (make-specialized-array (make-interval '#()))))
-  (test (mutable-array? A)
-        #t)
-  (let ((B (array-freeze! A)))
-    (test (mutable-array? B)
-          #f)
-    (test (eq? A B)
-          #t))
-  (test (mutable-array? A)
-        #f))
-
 (define (myindexer= indexer1 indexer2 interval)
   (array-fold-left (lambda (x y) (and x y))
                    #t
@@ -1002,7 +986,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (next-test-random-source-state!)
 
-(pp "array body, indexer, storage-class, and safe? error tests")
+(pp "array body, indexer, and storage-class error tests")
 
 (let ((a (make-array (make-interval '#(0 0) '#(1 1)) ;; not valid
                      values
@@ -1012,9 +996,7 @@ OTHER DEALINGS IN THE SOFTWARE.
   (test (array-indexer a)
         "array-indexer: The argument is not a specialized array: ")
   (test (array-storage-class a)
-        "array-storage-class: The argument is not a specialized array: ")
-  (test (array-safe? a)
-        "array-safe?: The argument is not a specialized array: "))
+        "array-storage-class: The argument is not a specialized array: "))
 
 (pp "make-specialized-array error tests")
 
@@ -1030,51 +1012,22 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (make-specialized-array (make-interval '#(0) '#(10)) u16-storage-class 'a)
       "make-specialized-array: The third argument cannot be manipulated by the second (a storage class): ")
 
-(test (make-specialized-array (make-interval '#(0) '#(10)) generic-storage-class 'a 'a)
-      "make-specialized-array: The fourth argument is not a boolean: ")
-
 ;;; let's test a few more
 
 (test (array-every (lambda (x) (eqv? x 42)) (make-specialized-array (make-interval '#(10)) u8-storage-class 42))
       #t)
 
-(test (array-safe? (make-specialized-array (make-interval '#(10)) u8-storage-class 42))
-      (specialized-array-default-safe?))
-
-(test (parameterize ((specialized-array-default-safe? #t)) (array-safe? (make-specialized-array (make-interval '#(10)) u8-storage-class 42)))
-      #t)
-
-(test (parameterize ((specialized-array-default-safe? #f)) (array-safe? (make-specialized-array (make-interval '#(10)) u8-storage-class 42)))
-      #f)
-
-(test (array-safe? (make-specialized-array (make-interval '#(10)) u8-storage-class 42  #t))
-      #t)
-
-(test (array-safe? (make-specialized-array (make-interval '#(10)) u8-storage-class 42 #f))
-      #f)
-
 (pp "make-specialized-array-from-data error tests")
 
-(test (make-specialized-array-from-data 'a 'a 'a 'a)
-      "make-specialized-array-from-data: The fourth argument is not a boolean: ")
-
-(test (make-specialized-array-from-data 'a 'a 'a #t)
-      "make-specialized-array-from-data: The third argument is not a boolean: ")
 
 (test (make-specialized-array-from-data 'a 'a 'a)
       "make-specialized-array-from-data: The third argument is not a boolean: ")
-
-(test (make-specialized-array-from-data 'a 'a #f #t)
-      "make-specialized-array-from-data: The second argument is not a storage class: ")
 
 (test (make-specialized-array-from-data 'a 'a #f)
       "make-specialized-array-from-data: The second argument is not a storage class: ")
 
 (test (make-specialized-array-from-data 'a 'a)
       "make-specialized-array-from-data: The second argument is not a storage class: ")
-
-(test (make-specialized-array-from-data 'a generic-storage-class #f #t)
-      "make-specialized-array-from-data: The first argument is not compatible with the storage class: ")
 
 (test (make-specialized-array-from-data 'a generic-storage-class #f)
       "make-specialized-array-from-data: The first argument is not compatible with the storage class: ")
@@ -1203,29 +1156,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 (for-each
  (lambda (operation message)
 
-   (test (operation 1 2 3 4 5)
-         (string-append message "The fifth argument is not a boolean: "))
-
-   (test (operation 1 2 3 4 #t)
-         (string-append message "The fourth argument is not a boolean: "))
-
    (test (operation 1 2 3 4)
          (string-append message "The fourth argument is not a boolean: "))
-
-   (test (operation 1 2 3 #t #t)
-         (string-append message "The third argument is not a storage class: "))
 
    (test (operation 1 2 3 #t)
          (string-append message "The third argument is not a storage class: "))
 
    (test (operation 1 2 3)
          (string-append message "The third argument is not a storage class: "))
-
-   (test (operation 'a 1 generic-storage-class #t #f)
-         (string-append message "The first argument is not a nonnegative fixnum: "))
-
-   (test (operation -1 1 generic-storage-class #t #f)
-         (string-append message "The first argument is not a nonnegative fixnum: "))
 
    (test (operation 'a 1 generic-storage-class #t)
          (string-append message "The first argument is not a nonnegative fixnum: "))
@@ -1365,14 +1303,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (for-each (lambda (operation data)
             (for-each (lambda (mutable?)
-                        (for-each (lambda (safe?)
-                                    (parameterize
-                                        ((specialized-array-default-mutable? mutable?)
-                                         (specialized-array-default-safe? safe?))
-                                      (let ((A (operation 2 data)))
-                                        (test (mutable-array? A) mutable?)
-                                        (test (array-safe? A) safe?))))
-                                  '(#t #f)))
+                        (parameterize
+                            ((specialized-array-default-mutable? mutable?))
+                          (let ((A (operation 2 data)))
+                            (test (mutable-array? A) mutable?))))
                       '(#t #f)))
           (list list*->array
                 vector*->array)
@@ -2026,15 +1960,6 @@ OTHER DEALINGS IN THE SOFTWARE.
               (define (wrap error-reason)
                 (string-append message error-reason))
 
-              (test (array-copy (make-array (make-interval '#(4)) list) u8-storage-class #t 'a)
-                    (wrap "The fourth argument is not a boolean: "))
-
-              (test (array-copy (make-array (make-interval '#(4)) list) u8-storage-class 'a #t)
-                    (wrap "The third argument is not a boolean: "))
-
-              (test (array-copy (make-array (make-interval '#(4)) list) 'u8-storage-class #t #t)
-                    (wrap "The second argument is not a storage-class: "))
-
               (test (array-copy 'a)
                     (wrap "The first argument is not an array: "))
 
@@ -2053,14 +1978,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                     (wrap "The third argument is not a boolean: "))
 
 
-              (test (array-copy (make-array (make-interval '#(1) '#(2))
-                                            list)
-                                generic-storage-class
-                                #f
-                                'a)
-                    (wrap "The fourth argument is not a boolean: "))
-
-              ;; Check that explicit setting of mutable? and safe? work
+              ;; Check that explicit setting of mutable?  works
 
 
               (test (mutable-array? (array-copy (list->array (make-interval '#(2 2))
@@ -2077,25 +1995,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                 #t))
                     #t)
 
-
-              (test (array-safe? (array-copy (list->array (make-interval '#(2 2))
-                                                          '(1 2 3 4)
-                                                          generic-storage-class
-                                                          #f
-                                                          #f)))
-                    #f)
-
-              (test (array-safe? (array-copy (list->array (make-interval '#(2 2))
-                                                          '(1 2 3 4)
-                                                          generic-storage-class
-                                                          #f
-                                                          #f)
-                                             generic-storage-class
-                                             #t
-                                             #t))
-                    #t)
-
-              ;; Check that defaults of mutable? and safe? work
+              ;; Check that default of mutable? works
 
               (parameterize
                   ((specialized-array-default-mutable? #t))
@@ -2122,22 +2022,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
               (parameterize
                   ((specialized-array-default-mutable? #f))
-                (test (array-safe? (array-copy (list->array (make-interval '#(2 2))
-                                                            '(1 2 3 4)
-                                                            generic-storage-class
-                                                            #t
-                                                            #t)))
-                      #t)
-
-                (test (array-safe? (array-copy (list->array (make-interval '#(2 2))
-                                                            '(1 2 3 4)
-                                                            generic-storage-class
-                                                            #t
-                                                            #t)
-                                               generic-storage-class
-                                               #f
-                                               #f))
-                      #f)
 
                 (test (mutable-array? (array-copy (make-array (make-interval '#(2 2)) list)))
                       #f)
@@ -2147,59 +2031,19 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                   #t))
                       #t))
 
-              (parameterize
-                  ((specialized-array-default-safe? #t))
-                (test (mutable-array? (array-copy (list->array (make-interval '#(2 2))
-                                                               '(1 2 3 4)
-                                                               generic-storage-class
-                                                               #f)))
-                      #f)
+              (test (mutable-array? (array-copy (list->array (make-interval '#(2 2))
+                                                             '(1 2 3 4)
+                                                             generic-storage-class
+                                                             #f)))
+                    #f)
 
-                (test (mutable-array? (array-copy (list->array (make-interval '#(2 2))
-                                                               '(1 2 3 4)
-                                                               generic-storage-class
-                                                               #f)
-                                                  generic-storage-class
-                                                  #t))
-                      #t)
-                (test (array-safe? (array-copy (make-array (make-interval '#(2 2)) list)))
-                      #t)
-
-                (test (array-safe? (array-copy (make-array (make-interval '#(2 2)) list)
-                                               generic-storage-class
-                                               #f
-                                               #f))
-                      #f))
-
-              (parameterize
-                  ((specialized-array-default-safe? #f))
-                (test (array-safe? (array-copy (list->array (make-interval '#(2 2))
-                                                            '(1 2 3 4)
-                                                            generic-storage-class
-                                                            #f
-                                                            #f)))
-                      #f)
-
-                (test (array-safe? (array-copy (list->array (make-interval '#(2 2))
-                                                            '(1 2 3 4)
-                                                            generic-storage-class
-                                                            #f
-                                                            #f)
-                                               generic-storage-class
-                                               #t
-                                               #t))
-                      #t)
-
-                (test (array-safe? (array-copy (make-array (make-interval '#(2 2)) list)))
-                      #f)
-
-                (test (array-safe? (array-copy (make-array (make-interval '#(2 2)) list)
-                                               generic-storage-class
-                                               #t
-                                               #t))
-                      #t))
-
-
+              (test (mutable-array? (array-copy (list->array (make-interval '#(2 2))
+                                                             '(1 2 3 4)
+                                                             generic-storage-class
+                                                             #f)
+                                                generic-storage-class
+                                                #t))
+                    #t)
 
               ;; We gotta make sure than the error checks work in all dimensions ...
 
@@ -2234,9 +2078,6 @@ OTHER DEALINGS IN THE SOFTWARE.
               ))
           '(#t #f))
 
-(test (specialized-array-default-safe? 'a)
-      "specialized-array-default-safe?: The argument is not a boolean: ")
-
 (test (specialized-array-default-mutable? 'a)
       "specialized-array-default-mutable?: The argument is not a boolean: ")
 
@@ -2254,62 +2095,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (pp "array-copy result tests")
 
-(specialized-array-default-safe? #t)
-
-(pp "Safe tests")
-
-(do ((i 0 (+ i 1)))
-    ((= i random-tests))
-  (let* ((domain
-          (random-interval))
-         (lower-bounds
-          (interval-lower-bounds->list domain))
-         (upper-bounds
-          (interval-upper-bounds->list domain))
-         (array1
-          (let ((alist '()))
-            (make-array
-             domain
-             (lambda indices
-               (cond ((assoc indices alist)
-                      => cdr)
-                     (else
-                      indices)))
-             (lambda (value . indices)
-               (cond ((assoc indices alist)
-                      =>(lambda (entry)
-                          (set-cdr! entry value)))
-                     (else
-                      (set! alist (cons (cons indices value)
-                                        alist))))))))
-         (array2
-          (array-copy array1 generic-storage-class))
-         (array2!
-          (array-copy! array1 generic-storage-class))
-         (setter1
-          (array-setter array1))
-         (setter2
-          (array-setter array2))
-         (setter2!
-          (array-setter array2!)))
-    (if (not (array-empty? array1))
-        (do ((j 0 (+ j 1)))
-            ((= j 25))
-          (let ((v (random 1000))
-                (indices (map random lower-bounds upper-bounds)))
-            (apply setter1 v indices)
-            (apply setter2 v indices)
-            (apply setter2! v indices))))
-    (test (myarray= array1 array2) #t)
-    (test (myarray= array1 array2!) #t)
-    (test (myarray= (array-copy array1 generic-storage-class) array2) #t)
-    (test (myarray= (array-copy array1 generic-storage-class) array2!) #t)))
-
-(next-test-random-source-state!)
-
-(specialized-array-default-safe? #f)
-
-(pp "Unsafe tests")
 
 (do ((i 0 (+ i 1)))
     ((= i random-tests))
@@ -2622,11 +2407,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                 ))
             (iota 6 1)))
 
-
-
-
-(specialized-array-default-safe? #t)
-
 (let ((array-builders (vector (list u1-storage-class      (lambda indices (random 0 (expt 2 1))))
                               (list u8-storage-class      (lambda indices (random 0 (expt 2 8))))
                               (list u16-storage-class     (lambda indices (random 0 (expt 2 16))))
@@ -2696,71 +2476,6 @@ OTHER DEALINGS IN THE SOFTWARE.
              (map (lambda (array)
                     ((storage-class-length (array-storage-class array)) (array-body array)))
                   arrays)))))
-
-(next-test-random-source-state!)
-
-(specialized-array-default-safe? #f)
-
-(let ((array-builders (vector (list u1-storage-class      (lambda indices (random (expt 2 1))))
-                              (list u8-storage-class      (lambda indices (random (expt 2 8))))
-                              (list u16-storage-class     (lambda indices (random (expt 2 16))))
-                              (list u32-storage-class     (lambda indices (random (expt 2 32))))
-                              (list u64-storage-class     (lambda indices (random (expt 2 64))))
-                              (list s8-storage-class      (lambda indices (random (- (expt 2 7))  (expt 2 7))))
-                              (list s16-storage-class     (lambda indices (random (- (expt 2 15)) (expt 2 15))))
-                              (list s32-storage-class     (lambda indices (random (- (expt 2 31)) (expt 2 31))))
-                              (list s64-storage-class     (lambda indices (random (- (expt 2 63)) (expt 2 63))))
-                              (list f16-storage-class     (lambda indices (test-random-real)))
-                              (list f32-storage-class     (lambda indices (test-random-real)))
-                              (list f64-storage-class     (lambda indices (test-random-real)))
-                              (list char-storage-class    (lambda indices (random-char)))
-                              (list c64-storage-class     (lambda indices (make-rectangular (test-random-real) (test-random-real))))
-                              (list c128-storage-class    (lambda indices (make-rectangular (test-random-real) (test-random-real))))
-                              (list generic-storage-class (lambda indices indices)))))
-  (do ((i 0 (+ i 1)))
-      ((= i random-tests))
-    (let* ((domain
-            (random-interval))
-           (lower-bounds
-            (interval-lower-bounds->list domain))
-           (upper-bounds
-            (interval-upper-bounds->list domain))
-           (arrays
-            (map (lambda (ignore)
-                   (let ((array-builder (vector-ref array-builders (random (vector-length array-builders)))))
-                     (array-copy (make-array domain
-                                             (cadr array-builder))
-                                 (car array-builder))))
-                 (local-iota 0 (random 1 7))))
-           (result-array-1
-            (apply array-map
-                   list
-                   arrays))
-           (result-array-2
-            (array-copy
-             (apply array-map
-                    list
-                    arrays)))
-           (getters
-            (map array-getter arrays))
-           (result-array-3
-            (make-array domain
-                        (lambda indices
-                          (map (lambda (g) (apply g indices)) getters)))))
-      (test (myarray= result-array-1 result-array-2)
-            #t)
-      (test (myarray= result-array-2 result-array-3)
-            #t)
-      (test (vector->list (array-body result-array-2))
-            (array-fold-right cons
-                              '()
-                              result-array-2))
-      (test (vector->list (array-body result-array-2))
-            (reverse (let ((result '()))
-                       (array-for-each (lambda (f)
-                                         (set! result (cons f result)))
-                                       result-array-2)
-                       result))))))
 
 (next-test-random-source-state!)
 
@@ -3075,9 +2790,6 @@ OTHER DEALINGS IN THE SOFTWARE.
               (test (array-decurry (make-array (make-interval '#()) list) generic-storage-class 'a)
                     (wrap "The third argument is not a boolean: "))
 
-              (test (array-decurry (make-array (make-interval '#()) list) generic-storage-class #f 'a)
-                    (wrap "The fourth argument is not a boolean: "))
-
               (test (array-decurry (make-array (make-interval '#()) list))
                     (wrap "Not all elements of the first argument (an array) are arrays: "))
 
@@ -3182,9 +2894,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (next-test-random-source-state!)
 
-
-(specialized-array-default-safe? #t)
-
 (do ((i 0 (+ i 1)))
     ((= i random-tests))
   (let* ((interval (random-interval))
@@ -3231,57 +2940,6 @@ OTHER DEALINGS IN THE SOFTWARE.
             #t))))
 
 (next-test-random-source-state!)
-
-(specialized-array-default-safe? #f)
-
-(do ((i 0 (+ i 1)))
-    ((= i random-tests))
-  (let* ((interval (random-interval))
-         (axes (local-iota 0 (interval-dimension interval)))
-         (lower-bounds (interval-lower-bounds->vector interval))
-         (upper-bounds (interval-upper-bounds->vector interval))
-         (a (array-copy (make-array interval list)))
-         (new-axis-order (vector-permute (list->vector axes) (random-permutation (length axes))))
-         (reverse-order? (list->vector (map (lambda (x) (zero? (random 2))) axes))))
-    (let ((b (make-array (make-interval (vector-permute lower-bounds new-axis-order)
-                                        (vector-permute upper-bounds new-axis-order))
-                         (lambda multi-index
-                           (apply (array-getter a)
-                                  (let* ((n (vector-length new-axis-order))
-                                         (multi-index-vector (list->vector multi-index))
-                                         (result (make-vector n)))
-                                    (do ((i 0 (+ i 1)))
-                                        ((= i n) (vector->list result))
-                                      (vector-set! result (vector-ref new-axis-order i)
-                                                   (if (vector-ref reverse-order? (vector-ref new-axis-order i))
-                                                       (+ (vector-ref lower-bounds (vector-ref new-axis-order i))
-                                                          (- (vector-ref upper-bounds (vector-ref new-axis-order i))
-                                                             (vector-ref multi-index-vector i)
-                                                             1))
-                                                       (vector-ref multi-index-vector i)))))))))
-          (c (specialized-array-share a
-                                      (make-interval (vector-permute lower-bounds new-axis-order)
-                                                     (vector-permute upper-bounds new-axis-order))
-                                      (lambda multi-index
-                                        (apply values
-                                               (let* ((n (vector-length new-axis-order))
-                                                      (multi-index-vector (list->vector multi-index))
-                                                      (result (make-vector n)))
-                                                 (do ((i 0 (+ i 1)))
-                                                     ((= i n) (vector->list result))
-                                                   (vector-set! result (vector-ref new-axis-order i)
-                                                                (if (vector-ref reverse-order? (vector-ref new-axis-order i))
-                                                                    (+ (vector-ref lower-bounds (vector-ref new-axis-order i))
-                                                                       (- (vector-ref upper-bounds (vector-ref new-axis-order i))
-                                                                          (vector-ref multi-index-vector i)
-                                                                          1))
-                                                                    (vector-ref multi-index-vector i))))))))))
-      (if (not (myarray= b c))
-          (pp (list "piffle"
-                    a b c))))))
-
-(next-test-random-source-state!)
-
 
 (pp "interval and array translation tests")
 
@@ -3656,8 +3314,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                (not (mutable-array? immutable-result)))
           #t))
 
-  (specialized-array-default-safe? #t)
-
   (do ((i 0 (+ i 1)))
       ((= i random-tests))
     (let* ((domain (random-interval))
@@ -3707,54 +3363,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (next-test-random-source-state!)
 
-  (specialized-array-default-safe? #f)
-
-  (do ((i 0 (+ i 1)))
-      ((= i random-tests))
-    (let* ((domain (random-interval))
-           (Array (let ((temp (make-array domain list)))
-                    (case (test-random-integer 3)
-                      ((0) temp)
-                      ((1) (array-copy temp))
-                      ((2) (let ((temp (array-copy temp)))
-                             (make-array (array-domain temp)
-                                         (array-getter temp)
-                                         (array-setter temp)))))))
-           (permutation (random-permutation (interval-dimension domain))))
-
-      (define (my-array-permute Array permutation)
-        (let* ((array-copy (array-copy Array))
-               (getter (array-getter array-copy))
-               (setter (array-setter array-copy))
-               (permutation-inverse (%%permutation-invert permutation)))
-          (make-array (interval-permute (array-domain Array)
-                                        permutation)
-                      (lambda args
-                        (apply getter
-                               (vector->list (vector-permute (list->vector args) permutation-inverse))))
-                      (lambda (v . args)
-                        (apply setter
-                               v
-                               (vector->list (vector-permute (list->vector args) permutation-inverse)))))))
-
-      ;; (pp (list domain permutation (interval-volume domain)))
-      (let ((permuted-array       (array-permute Array permutation))
-            (my-permuted-array (my-array-permute Array permutation)))
-        (if (and (not (array-empty? Array))
-                 (mutable-array? Array))
-            (let ((permuted-domain (interval-permute domain permutation)))
-              (do ((j 0 (+ j 1)))
-                  ((= j 50))
-                (call-with-values
-                    (lambda ()
-                      (random-multi-index permuted-domain))
-                  (lambda multi-index
-                    (let ((value (test-random-integer 10000)))
-                      (apply (array-setter permuted-array) value multi-index)
-                      (apply (array-setter my-permuted-array) value multi-index)))))))
-        (test (myarray= permuted-array
-                        my-permuted-array)
-              #t)))))
+  )
 
 (next-test-random-source-state!)
 
@@ -3969,8 +3578,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (let* ((specialized
         (make-specialized-array (make-interval '#(4 4))
                                 generic-storage-class
-                                #t     ;; mutable?
-                                #t))
+                                #t))     ;; mutable?
        (mutable
         (make-array (array-domain specialized)
                     (array-getter specialized)
@@ -4349,8 +3957,7 @@ OTHER DEALINGS IN THE SOFTWARE.
          (safe-specialized-destination
           (make-specialized-array (make-interval (make-vector d 10))
                                   u1-storage-class
-                                  0
-                                  #t))
+                                  0))
          (mutable-destination
           (make-array (array-domain safe-specialized-destination)
                       (array-getter safe-specialized-destination)
@@ -4427,21 +4034,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (array-dimension 'a)
       "array-dimension: The argument is not an array: ")
 
-(test (array-safe?
-       (array-copy (make-array (make-interval '#(0 0) '#(10 10)) list)
-                   generic-storage-class
-                   #t
-                   #t))
-      #t)
-
-
-(test (array-safe?
-       (array-copy (make-array (make-interval '#(0 0) '#(10 10)) list)
-                   generic-storage-class
-                   #t
-                   #f))
-      #f)
-
 (let ((array-builders (vector (list u1-storage-class      (lambda indices (random (expt 2 1))) '(a -1))
                               (list u8-storage-class      (lambda indices (random (expt 2 8))) '(a -1))
                               (list u16-storage-class     (lambda indices (random (expt 2 16))) '(a -1))
@@ -4467,8 +4059,7 @@ OTHER DEALINGS IN THE SOFTWARE.
            (invalid-entry (list-ref (caddr builders) (random 2)))
            (Array (array-copy (make-array domain random-entry)
                               storage-class
-                              #t   ; mutable
-                              #t)) ; safe
+                              #t))   ; mutable
            (getter (array-getter Array))
            (setter (array-setter Array))
            (dimension (interval-dimension domain))
@@ -4535,8 +4126,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                   (string-append name "The third argument is not a storage-class: "))
             (test (function (make-interval '#(0) '#(1)) arg generic-storage-class 'a)
                   (string-append name "The fourth argument is not a boolean: "))
-            (test (function (make-interval '#(0) '#(1)) arg generic-storage-class #t 'a)
-                  (string-append name "The fifth argument is not a boolean: "))
             (test (function (make-interval '#(0) '#(10)) arg)
                   (string-append name "The volume of the first argument does not equal the length of the second: "))
             (test (function (make-interval '#(0) '#(1)) arg u1-storage-class)
@@ -4573,8 +4162,7 @@ OTHER DEALINGS IN THE SOFTWARE.
            (random-entry (cadr builders))
            (Array (array-copy (make-array domain random-entry)
                               storage-class
-                              #f
-                              #t)) ; safe
+                              #f))
            (l (array->list Array))
            (mutable? (zero? (test-random-integer 2)))
            (new-list-array (list->array domain l storage-class mutable?))
@@ -4658,8 +4246,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 
 (pp "array-ref and array-set! tests")
-
-(specialized-array-default-safe? #t)
 
 (define A-ref
   (array-copy
@@ -4755,91 +4341,6 @@ OTHER DEALINGS IN THE SOFTWARE.
           42)
     (test (apply array-set! 2 42 (make-list d 0))
           "array-set!: The first argument is not a mutable array: ")))
-
-(specialized-array-default-safe? #f)
-
-(define A-ref
-  (array-copy
-   (make-array (make-interval '#(10 10))
-               (lambda (i j) (if (= i j) 1 0)))))
-
-(do ((i 1 (+ i 1)))
-    ((= i 6))
-  (test (apply array-ref 1 (make-list i 0))
-        "array-ref: The first argument is not an array: "))
-
-(test (array-ref A-ref 1)
-      "Wrong number of arguments passed to procedure ")
-
-#|
-   For unsafe arrays, this error will not be caught, and could crash the program.
-|#
-#;
-(test (array-ref A-ref 1 1001)
-      "array-getter: domain does not contain multi-index: ")
-
-(test (array-ref A-ref 4 4)
-      1)
-
-(test (array-ref A-ref 4 5)
-      0)
-
-(do ((d 0 (+ d 1)))
-    ((= d 6))
-  (let ((A (make-specialized-array (make-interval (make-vector d 1)) generic-storage-class 42)))
-    (test (apply array-ref A (make-list d 0))
-          42)
-    (test (apply array-ref 2 (make-list d 0))
-          (if (zero? d)
-              "array-ref: The argument is not an array: "
-              "array-ref: The first argument is not an array: "))))
-
-(test (array-ref (make-specialized-array (make-interval '#(0 0)) generic-storage-class 42) 0 0)
-      "array-getter: Array domain is empty: ")
-
-(test (array-set! (make-specialized-array (make-interval '#(0 0)) generic-storage-class 42) 42 0 0)
-      "array-setter: Array domain is empty: ")
-
-(define B-set!
-  (array-copy
-   (make-array (make-interval '#(10 10))
-               (lambda (i j) (if (= i j) 1 0)))
-   u1-storage-class))
-
-(test (array-set! 1 1 1)
-      "array-set!: The first argument is not a mutable array: ")
-
-(test (array-set! B-set!)
-      "Wrong number of arguments passed to procedure ")
-
-(test (array-set! B-set! 2)
-      "Wrong number of arguments passed to procedure ")
-
-(test (array-set! B-set! 2 1)
-      "Wrong number of arguments passed to procedure ")
-
-#|
-   For unsafe arrays, this error will not be caught, and could crash the program.
-|#
-#;
-(test (array-set! B-set! 2 1 1)
-      "array-setter: value cannot be stored in body: ")
-
-(array-set! B-set! 1 1 2)
-(array-set! B-set! 0 2 2)
-(array-display B-set!)
-
-(do ((d 0 (+ d 1)))
-    ((= d 6))
-  (let ((A (make-specialized-array (make-interval (make-vector d 1)) generic-storage-class 10)))
-    (apply array-set! A 42 (make-list d 0))
-    (test (apply array-ref A (make-list d 0))
-          42)
-    (test (apply array-set! 2 42 (make-list d 0))
-          "array-set!: The first argument is not a mutable array: ")))
-
-
-
 
 (pp "specialized-array-reshape tests")
 
@@ -5860,13 +5361,6 @@ that computes the componentwise products when we need them, the times are
            (wrap " Expecting a boolean as the fourth argument: "))
 
      (test (array-append 0
-                         (list (make-array (make-interval '#(1 1)) list) (make-array (make-interval '#(2 2)) list))
-                         u1-storage-class
-                         #t
-                         'a)
-           (wrap " Expecting a boolean as the fifth argument: "))
-
-     (test (array-append 0
                          (list (make-array (make-interval '#(2 4)) list)
                                (make-array (make-interval '#(3 5)) list)))
            (wrap " Expecting as the second argument a nonnull list of arrays with the same upper and lower bounds (except for index 0): "))
@@ -6207,14 +5701,6 @@ that computes the componentwise products when we need them, the times are
 
      (test (array-stack 0
                         (list (make-array (make-interval '#(2 2)) list) (make-array (make-interval '#(2 2)) list))
-                        u1-storage-class
-                        #t
-                        'a)
-           (wrap " Expecting a boolean as the fifth argument: "))
-
-
-     (test (array-stack 0
-                        (list (make-array (make-interval '#(2 2)) list) (make-array (make-interval '#(2 2)) list))
                         u1-storage-class)
            (wrap " Not all elements of the source can be stored in destination: "))
 
@@ -6385,12 +5871,6 @@ that computes the componentwise products when we need them, the times are
                         'a)
            (wrap "The third argument is not a boolean: "))
 
-     (test (array-block (make-array (make-interval '#(2 2)) list)
-                        u8-storage-class
-                        #f
-                        'a)
-           (wrap "The fourth argument is not a boolean: "))
-
      (test (array-block (make-array (make-interval '#(2 2)) list))
            (wrap "Not all elements of the first argument (an array) are arrays: "))
 
@@ -6436,24 +5916,15 @@ that computes the componentwise products when we need them, the times are
              (array-tile A-appended '#(#(2 1) #(2 1 3)))))
 
        (for-each (lambda (mutable?)
-                   (for-each (lambda (safe?)
-                               (let ((new-A (array-block A generic-storage-class mutable? safe?)))
-                                 (test (array-safe? new-A)
-                                       safe?)
-                                 (test (mutable-array? new-A)
-                                       mutable?)))
-                             '(#t #f)))
+                   (let ((new-A (array-block A generic-storage-class mutable?)))
+                     (test (mutable-array? new-A)
+                           mutable?)))
                  '(#t #f))
        (for-each (lambda (mutable?)
-                   (for-each (lambda (safe?)
-                               (parameterize ((specialized-array-default-mutable? mutable?)
-                                              (specialized-array-default-safe?    safe?))
-                                 (let ((new-A (array-block A generic-storage-class)))
-                                   (test (array-safe? new-A)
-                                         safe?)
-                                   (test (mutable-array? new-A)
-                                         mutable?))))
-                             '(#t #f)))
+                   (parameterize ((specialized-array-default-mutable? mutable?))
+                     (let ((new-A (array-block A generic-storage-class)))
+                       (test (mutable-array? new-A)
+                             mutable?))))
                  '(#t #f))
 
        (test (array-every equal?            ;; we convert them to list*'s to ignore domains.

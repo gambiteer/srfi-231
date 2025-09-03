@@ -71,7 +71,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 
 (define-type %%array
-  id: f27104f3-7acb-4727-8668-8aa83e8fbf20
+  id: 18fd25d7-2204-4920-a5bb-2474fb4de8e4
   copier: #f
   ;; Part of all arrays
   ;; an interval
@@ -91,8 +91,6 @@ OTHER DEALINGS IN THE SOFTWARE.
   (body read-only:)
   ;; see below
   (indexer read-only:)
-  ;; do we check whether bounds (in getters and setters) and values (in setters) are valid
-  (safe? read-only:)
   ;; are the elements adjacent and in order?
   (in-order? read-write:)
   )
@@ -761,8 +759,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%interval-contains-multi-index?-general interval multi-index))))
 
-;;; Applies f to every element of the domain; assumes that f is thread-safe,
-;;; the order of application is not specified
+;;; Applies f to every element of the domain
 
 (define (interval-for-each f interval)
   (cond ((not (interval? interval))
@@ -1066,14 +1063,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (declare (inline))
 
-(define specialized-array-default-safe?
-  (make-parameter
-   #f
-   (lambda (bool)
-     (if (boolean? bool)
-         bool
-         (error "specialized-array-default-safe?: The argument is not a boolean: " bool)))))
-
 (define specialized-array-default-mutable?
   (make-parameter
    #t
@@ -1110,7 +1099,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                   #f              ; storage-class
                   #f              ; body
                   #f              ; indexer
-                  #f              ; safe?
                   %%order-unknown ; in-order?
                   )))
 
@@ -1198,12 +1186,6 @@ OTHER DEALINGS IN THE SOFTWARE.
   (%%array-setter-set! A #f)
   (%%array-unsafe-setter-set! A #f)
   A)
-
-(define (array-freeze! A)
-  (cond ((not (array? A))
-         (error "array-freeze!: The argument is not an array: " A))
-        (else
-         (%%array-freeze! A))))
 
 (declare (not inline))
 
@@ -2005,12 +1987,6 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%array-storage-class obj))))
 
-(define (array-safe? obj)
-  (cond ((not (specialized-array? obj))
-         (error "array-safe?: The argument is not a specialized array: " obj))
-        (else
-         (%%array-safe? obj))))
-
 (define (%%array-empty? array)
   (%%interval-empty? (%%array-domain array)))
 
@@ -2256,15 +2232,15 @@ OTHER DEALINGS IN THE SOFTWARE.
                        (apply unsafe-setter value multi-index) (void))))))))
 
 
-(define (%%finish-specialized-array domain storage-class body indexer mutable? safe? in-order?)
+(define (%%finish-specialized-array domain storage-class body indexer mutable? in-order?)
   (let ((storage-class-getter (storage-class-getter storage-class))
         (storage-class-setter (storage-class-setter storage-class))
         (checker (storage-class-checker storage-class))
         (indexer indexer)
         (body body))
 
-    ;; we write the following three macros to specialize the setters and getters in the
-    ;; non-safe case to reduce one more function call.
+    ;; we write the following three macros to specialize the unsafe setters and getters
+    ;; to reduce one more function call.
 
     (define-macro (expand-storage-class original-suffix replacement-suffix expr)
 
@@ -2338,7 +2314,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                     storage-class
                     body
                     indexer
-                    safe?
                     in-order?))))
 
 (define (%%interval->basic-indexer interval)
@@ -2389,7 +2364,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                   storage-class
                                   initial-value
                                   ;; must be mutable
-                                  safe?)
+                                  )
   (let* ((body    ((storage-class-maker storage-class)
                    (%%interval-volume interval)
                    initial-value))
@@ -2399,27 +2374,23 @@ OTHER DEALINGS IN THE SOFTWARE.
                                 body
                                 indexer
                                 #t            ;; mutable?
-                                safe?
                                 #t)))         ;; new arrays are always in order
 
 (define (make-specialized-array-from-data data
                                           #!optional
                                           (storage-class generic-storage-class)
-                                          (mutable?      (specialized-array-default-mutable?))
-                                          (safe?         (specialized-array-default-safe?)))
-  (cond ((not (boolean? safe?))
-         (error "make-specialized-array-from-data: The fourth argument is not a boolean: " data storage-class mutable? safe?))
-        ((not (boolean? mutable?))
+                                          (mutable?      (specialized-array-default-mutable?)))
+  (cond ((not (boolean? mutable?))
          (error "make-specialized-array-from-data: The third argument is not a boolean: " data storage-class mutable?))
         ((not (storage-class? storage-class))
          (error "make-specialized-array-from-data: The second argument is not a storage class: " data storage-class))
         ((not ((storage-class-data? storage-class) data))
          (error "make-specialized-array-from-data: The first argument is not compatible with the storage class: " data))
         (else
-         (%%make-specialized-array-from-data data storage-class (and mutable? (##mutable? data)) safe?))))
+         (%%make-specialized-array-from-data data storage-class (and mutable? (##mutable? data))))))
 
 
-(define (%%make-specialized-array-from-data data storage-class mutable? safe?)
+(define (%%make-specialized-array-from-data data storage-class mutable?)
   (let* ((body
           ((storage-class-data->body storage-class) data))
          (indexer
@@ -2431,10 +2402,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                                 body
                                 indexer
                                 mutable?
-                                safe?
                                 #t)))         ;; this array is in order by definition
 
-(define (%%list*->array dimension nested-list storage-class mutable? safe?)
+(define (%%list*->array dimension nested-list storage-class mutable?)
 
   (define (shape-error)
     (error "list*->array: The second argument is not the right shape to be converted to an array of the given dimension: "
@@ -2480,7 +2450,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                        (flatten-nested-list dimension nested-list)
                        storage-class
                        mutable?
-                       safe?
                        "list*->array: "
                        #t))))
 
@@ -2488,11 +2457,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                       nested-data
                       #!optional
                       (storage-class generic-storage-class)
-                      (mutable?      (specialized-array-default-mutable?))
-                      (safe?         (specialized-array-default-safe?)))
-  (cond ((not (boolean? safe?))
-         (error "list*->array: The fifth argument is not a boolean: " dimension nested-data storage-class mutable? safe?))
-        ((not (boolean? mutable?))
+                      (mutable?      (specialized-array-default-mutable?)))
+  (cond ((not (boolean? mutable?))
          (error "list*->array: The fourth argument is not a boolean: " dimension nested-data storage-class mutable?))
         ((not (storage-class? storage-class))
          (error "list*->array: The third argument is not a storage class: " dimension nested-data storage-class))
@@ -2500,9 +2466,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                    (fx<= 0 dimension)))
          (error "list*->array: The first argument is not a nonnegative fixnum: " dimension nested-data))
         (else
-         (%%list*->array dimension nested-data storage-class mutable? safe?))))
+         (%%list*->array dimension nested-data storage-class mutable?))))
 
-(define (%%vector*->array dimension nested-vector storage-class mutable? safe?)
+(define (%%vector*->array dimension nested-vector storage-class mutable?)
 
   (define (shape-error)
     (error "vector*->array: The second argument is not the right shape to be converted to an array of the given dimension: "
@@ -2550,7 +2516,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                          (flatten-nested-vector dimension nested-vector)
                          storage-class
                          mutable?
-                         safe?
                          "vector*->array: "
                          #t))))  ;; fresh-v?
 
@@ -2558,11 +2523,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                         nested-data
                         #!optional
                         (storage-class generic-storage-class)
-                        (mutable?      (specialized-array-default-mutable?))
-                        (safe?         (specialized-array-default-safe?)))
-  (cond ((not (boolean? safe?))
-         (error "vector*->array: The fifth argument is not a boolean: " dimension nested-data storage-class mutable? safe?))
-        ((not (boolean? mutable?))
+                        (mutable?      (specialized-array-default-mutable?)))
+  (cond ((not (boolean? mutable?))
          (error "vector*->array: The fourth argument is not a boolean: " dimension nested-data storage-class mutable?))
         ((not (storage-class? storage-class))
          (error "vector*->array: The third argument is not a storage class: " dimension nested-data storage-class))
@@ -2570,29 +2532,27 @@ OTHER DEALINGS IN THE SOFTWARE.
                    (fx<= 0 dimension)))
          (error "vector*->array: The first argument is not a nonnegative fixnum: " dimension nested-data))
         (else
-         (%%vector*->array dimension nested-data storage-class mutable? safe?))))
+         (%%vector*->array dimension nested-data storage-class mutable?))))
 
 (define make-specialized-array
   (let ()
-    (define (one-arg interval storage-class initial-value safe?)
+    (define (one-arg interval storage-class initial-value)
       (cond ((not (interval? interval))
              (error "make-specialized-array: The first argument is not an interval: "
                     interval))
             (else
              (%%make-specialized-array interval
                                        storage-class
-                                       initial-value
-                                       safe?))))
-    (define (two-args interval storage-class initial-value safe?)
+                                       initial-value))))
+    (define (two-args interval storage-class initial-value)
       (cond ((not (storage-class? storage-class))
              (error "make-specialized-array: The second argument is not a storage-class: "
                     interval storage-class))
             (else
              (one-arg interval
                       storage-class
-                      (storage-class-default storage-class)
-                      safe?))))
-    (define (three-args interval storage-class initial-value safe?)
+                      (storage-class-default storage-class)))))
+    (define (three-args interval storage-class initial-value)
       (cond ((not (storage-class? storage-class))
              (error "make-specialized-array: The second argument is not a storage-class: "
                     interval storage-class initial-value))
@@ -2602,38 +2562,20 @@ OTHER DEALINGS IN THE SOFTWARE.
             (else
              (one-arg interval           ;; calls one-arg directly, not two-args
                       storage-class
-                      initial-value
-                      safe?))))
-    (define (four-args interval storage-class initial-value safe?)
-      (cond ((not (boolean? safe?))
-             (error "make-specialized-array: The fourth argument is not a boolean: "
-                    interval storage-class initial-value safe?))
-            (else
-             (three-args interval
-                         storage-class
-                         initial-value
-                         safe?))))
+                      initial-value))))
     (case-lambda
      ((interval)
       (one-arg interval
                generic-storage-class
-               (storage-class-default generic-storage-class)
-               (specialized-array-default-safe?)))
+               (storage-class-default generic-storage-class)))
      ((interval storage-class)
       (two-args interval
                 storage-class
-                'ignore
-                (specialized-array-default-safe?)))
+                'ignore))
      ((interval storage-class initial-value)
       (three-args interval
                   storage-class
-                  initial-value
-                  (specialized-array-default-safe?)))
-     ((interval storage-class initial-value safe?)
-      (four-args interval
-                 storage-class
-                 initial-value
-                 safe?)))))
+                  initial-value)))))
 
 (define %%known-storage-classes
 
@@ -2888,7 +2830,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; Builds a new specialized-array and populates the body of the result with
 ;;; (array-getter array) applied to the elements of (array-domain array)
 
-(define (%%generalized-array->specialized-array array storage-class mutable? safe? caller)
+(define (%%generalized-array->specialized-array array storage-class mutable? caller)
   (let* ((domain            (%%array-domain array))
          (reversed-elements (%%array->reversed-list array))
          (n                 (%%interval-volume domain))
@@ -2909,7 +2851,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                           body
                                           indexer
                                           mutable?
-                                          safe?
                                           #t)))
         (let loop ((i (fx- n 1))
                    (l reversed-elements))
@@ -2919,32 +2860,29 @@ OTHER DEALINGS IN THE SOFTWARE.
                     (setter body i (car l))
                     (loop (fx- i 1)
                           (cdr l)))
-                  (error (string-append caller "Not all elements of the source can be stored in destination: ") array storage-class mutable? safe?))
+                  (error (string-append caller "Not all elements of the source can be stored in destination: ") array storage-class mutable?))
               (%%finish-specialized-array domain
                                           storage-class
                                           body
                                           indexer
                                           mutable?
-                                          safe?
                                           #t))))))
 
 (define (%%->specialized-array array storage-class caller)
   (if (specialized-array? array)
       array
-      (%%generalized-array->specialized-array array storage-class #f #f caller)))
+      (%%generalized-array->specialized-array array storage-class #f caller)))
 
 (define (%!array-copy array
                       result-storage-class
                       mutable?
-                      safe?
                       caller
                       call/cc-safe?)
   (if (or (specialized-array? array)
           (not call/cc-safe?))
       (let ((result (%%make-specialized-array (%%array-domain array)
                                               result-storage-class
-                                              (storage-class-default result-storage-class)
-                                              safe?)))
+                                              (storage-class-default result-storage-class))))
         (%%move-array-elements result array caller)
         (if (not mutable?)            ;; set the setter to #f if the final array is not mutable
             (%%array-freeze! result)
@@ -2952,7 +2890,6 @@ OTHER DEALINGS IN THE SOFTWARE.
       (%%generalized-array->specialized-array array
                                               result-storage-class
                                               mutable?
-                                              safe?
                                               caller)))
 
 (define (%%make-array-copy call/cc-safe?)
@@ -2965,37 +2902,26 @@ OTHER DEALINGS IN THE SOFTWARE.
   (define (wrap error-reason)
     (string-append caller error-reason))
 
-  (define (four-args array result-storage-class mutable? safe?)
-    (if (not (boolean? safe?))
-        (error (wrap "The fourth argument is not a boolean: ") safe?)
-        (three-args array
-                    result-storage-class
-                    mutable?
-                    safe?)))
-
-  (define (three-args array result-storage-class mutable? safe?)
+  (define (three-args array result-storage-class mutable?)
     (if (not (boolean? mutable?))
         (error (wrap "The third argument is not a boolean: ") mutable?)
         (two-args array
                   result-storage-class
-                  mutable?
-                  safe?)))
+                  mutable?)))
 
-  (define (two-args array result-storage-class mutable? safe?)
+  (define (two-args array result-storage-class mutable?)
     (if (not (storage-class? result-storage-class))
         (error (wrap "The second argument is not a storage-class: ") result-storage-class)
         (one-arg array
                  result-storage-class
-                 mutable?
-                 safe?)))
+                 mutable?)))
 
-  (define (one-arg array result-storage-class mutable? safe?)
+  (define (one-arg array result-storage-class mutable?)
     (if (not (array? array))
         (error (wrap "The first argument is not an array: ") array)
         (%!array-copy array
                       result-storage-class
                       mutable?
-                      safe?
                       caller
                       call/cc-safe?)))
 
@@ -3004,37 +2930,26 @@ OTHER DEALINGS IN THE SOFTWARE.
     (if (specialized-array? array)
         (one-arg array
                  (%%array-storage-class array)
-                 (mutable-array? array)
-                 (%%array-safe? array))
+                 (mutable-array? array))
         (one-arg array
                  generic-storage-class
-                 (specialized-array-default-mutable?)
-                 (specialized-array-default-safe?))))
+                 (specialized-array-default-mutable?))))
    ((array storage-class)
     (if (specialized-array? array)
         (two-args array
                   storage-class
-                  (mutable-array? array)
-                  (%%array-safe? array))
+                  (mutable-array? array))
         (two-args array
                   storage-class
-                  (specialized-array-default-mutable?)
-                  (specialized-array-default-safe?))))
+                  (specialized-array-default-mutable?))))
    ((array storage-class mutable?)
     (if (specialized-array? array)
         (three-args array
                     storage-class
-                    mutable?
-                    (%%array-safe? array))
+                    mutable?)
         (three-args array
                     storage-class
-                    mutable?
-                    (specialized-array-default-safe?))))
-   ((array storage-class mutable? safe?)
-    (four-args array
-               storage-class
-               mutable?
-               safe?))))
+                    mutable?)))))
 
 (define array-copy (%%make-array-copy #t))
 
@@ -3128,7 +3043,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                 body
                                 (%%compose-indexers old-indexer new-domain new-domain->old-domain)
                                 (mutable-array? array)
-                                (%%array-safe? array)
                                 in-order?)))
 
 
@@ -4324,7 +4238,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                        l
                        result-storage-class
                        mutable?
-                       safe?
                        caller
                        fresh-l?)
   (let* ((checker
@@ -4334,8 +4247,7 @@ OTHER DEALINGS IN THE SOFTWARE.
          (result
           (%%make-specialized-array interval
                                     result-storage-class
-                                    (storage-class-default result-storage-class)
-                                    safe?))
+                                    (storage-class-default result-storage-class)))
          (body
           (%%array-body result))
          (n
@@ -4381,8 +4293,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                      l
                      #!optional
                      (result-storage-class generic-storage-class)
-                     (mutable? (specialized-array-default-mutable?))
-                     (safe? (specialized-array-default-safe?)))
+                     (mutable? (specialized-array-default-mutable?)))
   (cond ((not (interval? interval))
          (error "list->array: The first argument is not an interval: " interval l))
         ((not (list? l))
@@ -4391,14 +4302,11 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "list->array: The third argument is not a storage-class: " interval l result-storage-class))
         ((not (boolean? mutable?))
          (error "list->array: The fourth argument is not a boolean: " interval l result-storage-class mutable?))
-        ((not (boolean? safe?))
-         (error "list->array: The fifth argument is not a boolean: " interval l result-storage-class mutable? safe?))
         (else
          (%%list->array interval
                         l
                         result-storage-class
                         mutable?
-                        safe?
                         "list->array: "
                         #f))))  ;; fresh-l?
 
@@ -4406,7 +4314,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                          v
                          result-storage-class
                          mutable?
-                         safe?
                          caller
                          fresh-v?)
   (if (eq? result-storage-class generic-storage-class)
@@ -4415,7 +4322,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                   (if fresh-v? v (vector-copy v))
                                   (%%interval->basic-indexer interval)
                                   mutable?
-                                  safe?
                                   #t) ;; in order
       (let* ((v      (if (or fresh-v?
                              (%%known-storage-class? result-storage-class))
@@ -4440,15 +4346,13 @@ OTHER DEALINGS IN THE SOFTWARE.
                                     body
                                     (%%interval->basic-indexer interval)
                                     mutable?
-                                    safe?
                                     #t)))) ;; in-order
 
 (define (vector->array interval
                        v
                        #!optional
                        (result-storage-class generic-storage-class)
-                       (mutable? (specialized-array-default-mutable?))
-                       (safe? (specialized-array-default-safe?)))
+                       (mutable? (specialized-array-default-mutable?)))
   (cond ((not (interval? interval))
          (error "vector->array: The first argument is not an interval: " interval v))
         ((not (vector? v))
@@ -4460,14 +4364,11 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "vector->array: The third argument is not a storage-class: " interval v result-storage-class))
         ((not (boolean? mutable?))
          (error "vector->array: The fourth argument is not a boolean: " interval v result-storage-class mutable?))
-        ((not (boolean? safe?))
-         (error "vector->array: The fifth argument is not a boolean: " interval v result-storage-class mutable? safe?))
         (else
          (%%vector->array interval
                           v
                           result-storage-class
                           mutable?
-                          safe?
                           "vector->array: "
                           #f))))  ;; fresh-v?
 
@@ -4555,7 +4456,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; Refactored from array-stack
 
-(define (%%%array-stack k arrays storage-class mutable? safe? caller call/cc-safe?)
+(define (%%%array-stack k arrays storage-class mutable? caller call/cc-safe?)
   (let* ((arrays
           (list-copy arrays))
          (arrays
@@ -4587,8 +4488,7 @@ OTHER DEALINGS IN THE SOFTWARE.
          (result-array
           (%%make-specialized-array result-domain
                                     storage-class
-                                    (storage-class-default storage-class)
-                                    safe?))
+                                    (storage-class-default storage-class)))
          (permuted-and-curried-result
           (%%array-curry (%%array-permute result-array (%%index-first result-dimension k))
                          domain-dimension)))
@@ -4600,7 +4500,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            arrays
                                            generic-storage-class
                                            #f
-                                           #f
                                            caller
                                            #t)))  ;; fresh-l?
     (if (not mutable?)
@@ -4611,20 +4510,18 @@ OTHER DEALINGS IN THE SOFTWARE.
                      arrays
                      #!optional
                      (storage-class generic-storage-class)
-                     (mutable?      (specialized-array-default-mutable?))
-                     (safe?         (specialized-array-default-safe?)))
-  (%%array-stack k arrays storage-class mutable? safe? #t))
+                     (mutable?      (specialized-array-default-mutable?)))
+  (%%array-stack k arrays storage-class mutable? #t))
 
 
 (define (array-stack! k
                       arrays
                       #!optional
                       (storage-class generic-storage-class)
-                      (mutable?      (specialized-array-default-mutable?))
-                      (safe?         (specialized-array-default-safe?)))
-  (%%array-stack k arrays storage-class mutable? safe? #f))
+                      (mutable?      (specialized-array-default-mutable?)))
+  (%%array-stack k arrays storage-class mutable? #f))
 
-(define (%%array-stack k arrays storage-class mutable? safe? call/cc-safe?)
+(define (%%array-stack k arrays storage-class mutable? call/cc-safe?)
 
   (define caller
     (if call/cc-safe?
@@ -4644,29 +4541,25 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error (string-append caller "Expecting a storage class as the third argument: ") k arrays storage-class))
         ((not (boolean? mutable?))
          (error (string-append caller "Expecting a boolean as the fourth argument: ") k arrays storage-class mutable?))
-        ((not (boolean? safe?))
-         (error (string-append caller "Expecting a boolean as the fifth argument: ") k arrays storage-class mutable? safe?))
         (else
          ;; We copy the arrays argument in case any of the array getters modify the arrays list argument
-         (%%%array-stack k arrays storage-class mutable? safe? caller call/cc-safe?))))
+         (%%%array-stack k arrays storage-class mutable? caller call/cc-safe?))))
 
 (define (array-append k
                       arrays
                       #!optional
                       (storage-class generic-storage-class)
-                      (mutable?      (specialized-array-default-mutable?))
-                      (safe?         (specialized-array-default-safe?)))
-  (%%array-append k arrays storage-class mutable? safe? #t))
+                      (mutable?      (specialized-array-default-mutable?)))
+  (%%array-append k arrays storage-class mutable? #t))
 
 (define (array-append! k
                        arrays
                        #!optional
                        (storage-class generic-storage-class)
-                       (mutable?      (specialized-array-default-mutable?))
-                       (safe?         (specialized-array-default-safe?)))
-  (%%array-append k arrays storage-class mutable? safe? #f))
+                       (mutable?      (specialized-array-default-mutable?)))
+  (%%array-append k arrays storage-class mutable? #f))
 
-(define (%%array-append k arrays storage-class mutable? safe? call/cc-safe?)
+(define (%%array-append k arrays storage-class mutable? call/cc-safe?)
 
   (define caller
     (if call/cc-safe?
@@ -4686,8 +4579,6 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error (string-append caller "Expecting a storage class as the third argument: ") k arrays storage-class))
         ((not (boolean? mutable?))
          (error (string-append caller "Expecting a boolean as the fourth argument: ") k arrays storage-class mutable?))
-        ((not (boolean? safe?))
-         (error (string-append caller "Expecting a boolean as the fifth argument: ") k arrays storage-class mutable? safe?))
         ((not (let ((first-domain (%%array-domain (car arrays))))
                 (%%every (lambda (d)
                            (%%every (lambda (i)
@@ -4739,8 +4630,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                         (vector-set! uppers k kth-size)
                         (make-interval lowers uppers))  ;; copies lowers and uppers
                       storage-class
-                      (storage-class-default storage-class)
-                      safe?))
+                      (storage-class-default storage-class)))
                     (translation
                      ;; a vector we'll use to align each argument
                      ;; array into the proper subarray of the result
@@ -4767,18 +4657,16 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (array-decurry A-arg
                        #!optional
                        (storage-class generic-storage-class)
-                       (mutable?      (specialized-array-default-mutable?))
-                       (safe?         (specialized-array-default-safe?)))
-  (%%array-decurry A-arg storage-class mutable? safe? #t))
+                       (mutable?      (specialized-array-default-mutable?)))
+  (%%array-decurry A-arg storage-class mutable? #t))
 
 (define (array-decurry! A-arg
                         #!optional
                         (storage-class generic-storage-class)
-                        (mutable?      (specialized-array-default-mutable?))
-                        (safe?         (specialized-array-default-safe?)))
-  (%%array-decurry A-arg storage-class mutable? safe? #f))
+                        (mutable?      (specialized-array-default-mutable?)))
+  (%%array-decurry A-arg storage-class mutable? #f))
 
-(define (%%array-decurry A-arg storage-class mutable? safe? call/cc-safe?)
+(define (%%array-decurry A-arg storage-class mutable? call/cc-safe?)
 
   (define caller
     (if call/cc-safe?
@@ -4793,8 +4681,6 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error (string-append caller "The second argument is not a storage class: ") A-arg storage-class))
         ((not (boolean? mutable?))
          (error (string-append caller "The third argument is not a boolean: ") A-arg storage-class mutable?))
-        ((not (boolean? safe?))
-         (error (string-append caller "The fourth argument is not a boolean: ") A-arg storage-class mutable? safe?))
         (else
          (let* ((A   (array-copy A-arg))
                 (A_  (%%array-unsafe-getter A))
@@ -4817,8 +4703,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                             (result-domain  (%%interval-cartesian-product (list A_D first-domain)))
                             (result         (%%make-specialized-array result-domain
                                                                       storage-class
-                                                                      (storage-class-default storage-class)
-                                                                      safe?))
+                                                                      (storage-class-default storage-class)))
                             (curried-result (%%array-curry result (%%interval-dimension first-domain))))
                        (%%array-for-each (lambda (result argument)
                                            (%%move-array-elements result
@@ -4832,18 +4717,16 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (array-block A-arg
                      #!optional
                      (storage-class generic-storage-class)
-                     (mutable?      (specialized-array-default-mutable?))
-                     (safe?         (specialized-array-default-safe?)))
-  (%%array-block A-arg storage-class mutable? safe? #t))
+                     (mutable?      (specialized-array-default-mutable?)))
+  (%%array-block A-arg storage-class mutable? #t))
 
 (define (array-block! A-arg
                       #!optional
                       (storage-class generic-storage-class)
-                      (mutable?      (specialized-array-default-mutable?))
-                      (safe?         (specialized-array-default-safe?)))
-  (%%array-block A-arg storage-class mutable? safe? #f))
+                      (mutable?      (specialized-array-default-mutable?)))
+  (%%array-block A-arg storage-class mutable? #f))
 
-(define (%%array-block A-arg storage-class mutable? safe? call/cc-safe?)
+(define (%%array-block A-arg storage-class mutable? call/cc-safe?)
 
   (define caller
     (if call/cc-safe?
@@ -4858,8 +4741,6 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error (string-append caller "The second argument is not a storage class: ") A-arg storage-class))
         ((not (boolean? mutable?))
          (error (string-append caller "The third argument is not a boolean: ") A-arg storage-class mutable?))
-        ((not (boolean? safe?))
-         (error (string-append caller "The fourth argument is not a boolean: ") A-arg storage-class mutable? safe?))
         (else
          (let* ((A                (%%array-translate     ;; make lower-bounds zero
                                    (array-copy A-arg)  ;; evaluate all (array) elements of A-arg
@@ -4929,8 +4810,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                           (vector-ref v (fx- (vector-length v) 1)))
                                         slice-offsets))
                            storage-class
-                           (storage-class-default storage-class)
-                           safe?)))
+                           (storage-class-default storage-class))))
                     ;; We copy the elements from each input array block to the corresponding block
                     ;; in the result array.
                     (%%interval-for-each
@@ -5100,7 +4980,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                                   (%%array-body array)
                                   (lambda args (apply error "indexer of empty array should not be called" args))  ;; meaningless
                                   (mutable-array? array)
-                                  (%%array-safe? array)
                                   (%%array-in-order? array))
       (let* ((indexer
               (%%array-indexer array))
@@ -5189,7 +5068,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                                    (%!array-copy array
                                                  (%%array-storage-class array)
                                                  (mutable-array? array)
-                                                 (%%array-safe? array)
                                                  "specialized-array-reshape: "
                                                  #f)
                                    new-domain
@@ -5248,5 +5126,4 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                                             (%%array-body array)
                                             indexer
                                             (mutable-array? array)
-                                            (%%array-safe? array)
                                             (%%array-in-order? array))))))))
