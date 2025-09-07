@@ -25,6 +25,7 @@
     interval-dilate
     interval-intersect
     interval-translate
+    interval-rebase
     interval-permute
     interval-scale
     interval-cartesian-product
@@ -81,6 +82,7 @@
     array-extract
     array-tile
     array-translate
+    array-rebase
     array-permute
     array-reverse
     array-sample

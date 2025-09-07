@@ -181,6 +181,11 @@ OTHER DEALINGS IN THE SOFTWARE.
      #(0 0 0)
      #(0 0 0 0)))
 
+(define (%%allocate-zero-vector dimension)
+  (if (fx< dimension 5)
+      (vector-ref %%vector-of-zeros dimension)
+      (make-vector dimension 0)))
+
 (define (%%finish-interval lower-bounds upper-bounds)
   ;; Requires that lower-bounds and upper-bounds are not user visible and therefore
   ;; not user modifiable.
@@ -197,11 +202,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                      (vector-every (lambda (x) (not (negative? x))) upper-bounds)))
            (error "make-interval: The argument is not a vector of nonnegative exact integers: " upper-bounds))
           (else
-           (let ((dimension (vector-length upper-bounds)))
-             (%%finish-interval (if (fx< dimension 5)
-                                    (vector-ref %%vector-of-zeros dimension)
-                                    (make-vector dimension 0))
-                                (vector-copy upper-bounds))))))
+           (%%finish-interval (%%allocate-zero-vector (vector-length upper-bounds))
+                              (vector-copy upper-bounds)))))
    ((lower-bounds upper-bounds)
     (cond ((not (and (vector? lower-bounds)
                      (vector-every (lambda (x) (exact-integer? x)) lower-bounds)))
@@ -563,6 +565,39 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (%%interval-translate Interval translation)
   (%%finish-interval (vector-map (lambda (x y) (+ x y)) (%%interval-lower-bounds Interval) translation)
                      (vector-map (lambda (x y) (+ x y)) (%%interval-upper-bounds Interval) translation)))
+
+(define interval-rebase
+  (case-lambda
+   ((interval)
+    (cond ((not (interval? interval))
+           (error "interval-rebase: The argument is not an interval: " interval))
+          (else
+           (%%interval-rebase interval))))
+   ((interval new-lower-bounds)
+    (cond ((not (interval? interval))
+           (error "interval-rebase: The first argument is not an interval: " interval new-lower-bounds))
+          ((not (translation? new-lower-bounds))
+           (error "interval-rebase: The second argument is not an vector of exact integers: " interval new-lower-bounds))
+          ((not (fx= (%%interval-dimension interval)
+                     (vector-length new-lower-bounds)))
+           (error "interval-rebase: The length of the second argument is not the dimension of the first argument: " interval new-lower-bounds))
+          (else
+           (%%interval-rebase interval new-lower-bounds))))))
+
+(define (%%interval-rebase interval
+                           #!optional
+                           (new-lower-bounds
+                            (%%allocate-zero-vector
+                             (%%interval-dimension interval))))
+  (let ((lower-bounds (%%interval-lower-bounds interval))
+        (upper-bounds (%%interval-upper-bounds interval)))
+    (%%finish-interval new-lower-bounds
+                       (vector-map (lambda (u l new-l)
+                                     (- (+ u new-l)
+                                        l))
+                                   upper-bounds
+                                   lower-bounds
+                                   new-lower-bounds))))
 
 (define (%%interval-scale interval scales)
   (let* ((uppers (%%interval-upper-bounds interval))
@@ -3265,6 +3300,46 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%array-translate array translation))))
 
+(define (%%array-rebase array new-lower-bounds)
+  (let* ((domain
+          (%%array-domain array))
+         (old-lower-bounds
+          (%%interval-lower-bounds domain))
+         (translation
+          (vector-map - new-lower-bounds old-lower-bounds))
+         (new-domain
+          (%%interval-rebase domain new-lower-bounds)))
+    (cond ((specialized-array? array)
+             (%%specialized-array-share array
+                                        new-domain
+                                        (%%getter-translate values translation)
+                                        (%%array-in-order? array)))
+            ((mutable-array? array)
+             (%%make-safer-array new-domain
+                                 (%%getter-translate (%%array-unsafe-getter array) translation)
+                                 (%%setter-translate (%%array-unsafe-setter array) translation)))
+            (else
+             (%%make-safer-array new-domain
+                                 (%%getter-translate (%%array-unsafe-getter array) translation))))))
+
+(define array-rebase
+  (case-lambda
+   ((array)
+    (cond ((not (array? array))
+           (error "array-rebase: The argument is not an array: " array))
+          (else
+           (%%array-rebase array (%%allocate-zero-vector (%%array-dimension array))))))
+   ((array new-lower-bounds)
+    (cond ((not (array? array))
+           (error "array-rebase: The first argument is not an array: " array new-lower-bounds))
+          ((not (translation? new-lower-bounds))
+           (error "array-rebase: The second argument is not a vector of exact integers: " array new-lower-bounds))
+          ((not (fx= (vector-length new-lower-bounds)
+                     (%%array-dimension array)))
+           (error "array-rebase: The length of the second argument is not the dimension of the first: " array new-lower-bounds))
+          (else
+           (%%array-rebase array new-lower-bounds))))))
+
 (define-macro (setup-permuted-getters-and-setters)
 
   (define (list-remove l i)
@@ -4602,11 +4677,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                         (vector-set! uppers k kth-size)
                         (make-interval lowers uppers))  ;; copies lowers and uppers
                       storage-class
-                      (storage-class-default storage-class)))
-                    (translation
-                     ;; a vector we'll use to align each argument
-                     ;; array into the proper subarray of the result
-                     (make-vector (%%array-dimension first-array) 0)))
+                      (storage-class-default storage-class))))
                (let loop ((arrays arrays)
                           (subdividers axis-subdividers))
                  (if (null? arrays)
@@ -4617,11 +4688,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                      (let ((array (car arrays)))
                        (vector-set! lowers k (car subdividers))
                        (vector-set! uppers k (cadr subdividers))
-                       (vector-set! translation k (- (car subdividers)
-                                                     (%%interval-lower-bound (%%array-domain array) k)))
                        (%%move-array-elements
                         (%%array-extract result (%%finish-interval lowers uppers))
-                        (%%array-translate array translation)
+                        (%%array-rebase array lowers)
                         caller)
                        (loop (cdr arrays)
                              (cdr subdividers)))))))))))
@@ -4714,9 +4783,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (boolean? mutable?))
          (error (string-append caller "The third argument is not a boolean: ") A-arg storage-class mutable?))
         (else
-         (let* ((A                (%%array-translate     ;; make lower-bounds zero
-                                   (array-copy A-arg)  ;; evaluate all (array) elements of A-arg
-                                   (vector-map (lambda (x) (- x)) (%%interval-lower-bounds (%%array-domain A-arg)))))
+         (let* ((A                (array-rebase (array-copy A-arg)))  ;; evaluate all elements of A-arg, and make lower bounds zero
                 (A_D              (%%array-domain A))
                 (A_dim            (%%interval-dimension A_D))
                 (ks               (list->vector (iota A_dim))))
@@ -4796,14 +4863,10 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            ks))
                               (subarray
                                (apply A_ multi-index))
-                              (translated-subarray  ;; translate the subarray to corner
-                               (%%array-translate
-                                subarray
-                                (vector-map (lambda (x y) (- x y))
-                                            corner
-                                            (%%interval-lower-bounds (%%array-domain subarray))))))
-                         (%%move-array-elements (%%array-extract result (%%array-domain translated-subarray))
-                                                translated-subarray
+                              (rebased-subarray  ;; rebase the subarray to corner
+                               (%%array-rebase subarray corner)))
+                         (%%move-array-elements (%%array-extract result (%%array-domain rebased-subarray))
+                                                rebased-subarray
                                                 caller)))
                      A_D)
                     (if (not mutable?)

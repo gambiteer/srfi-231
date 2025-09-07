@@ -131,6 +131,7 @@ MathJax.Hub.Config({
         (<ul>
          (<li> "The implementation no longer specifies, or implements, a difference between \"safe\" and \"unsafe\" arrays.  The getters and setters of all arrays made in the library check array indices for correctness; the setters of mutable specialized arrays check that the values they store into arrays are of the correct type.  So arguments that specify whether array results are \"safe\" or \"unsafe\" have been removed, as well as the parameter "(<code> "specialized-array-default-safe?")".")
          (<li> (<code>'array-freeze!)" has been removed.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly \"freeze\" a mutable array to make an immutable array.")
+         (<li> (<code>"(array-rebase array lower-bounds)")" and "(<code>"(interval-rebase interval lower-bounds)")" have been added to the SRFI.  "(<code>'array-rebase)" and "(<code>'interval-rebase)" translate an array or interval, respectively, so that it has lower bounds specified by the optional second argument.  If the second argument is omitted, then the array or interval is translated so that its lower bounds are all zero.")
          )
 
         (<h2> (<a> id: "Overview" "Overview"))
@@ -148,7 +149,7 @@ MathJax.Hub.Config({
          (<li> (<a> href: "#array-extract" (<code>'array-extract))
                ": Constructs a rectangular \"window\" or \"view\" into an existing array, like a rectangular region of a spreadsheet, or a submatrix of a matrix.")
          (<li> (<a> href: "#array-translate" (<code>'array-translate))
-               ": Slides an array around, like changing the zero-based indexing of C arrays to the 1-based indexing of Fortran arrays. If you wanted to compare two subimages of the same number of rows and columns of pixels, for example, you could use array-extract to select each of the subimages, and then use array-translate to overlay one on the other, i.e., to use the same indexing for both.")
+               ": Slides an array around, like changing the zero-based indexing of C arrays to the 1-based indexing of Fortran arrays. If you wanted to compare two subimages of the same number of rows and columns of pixels, for example, you could use " (<code>'array-extract)" to select each of the subimages, and then use "(<code>'array-translate)" to overlay one on the other, i.e., to use the same indexing for both. " (<a> href: "#array-rebase" (<code>'array-rebase))" is like "(<code>'array-translate)" except that you specify the lower bounds of the new array instead of specifying the translation.")
          (<li> (<a> href: "#array-permute"(<code>'array-permute))
                ": Swaps rows, columns, sheets, etc., of the original array, like swapping rows and columns in a spreadsheet or transposing a matrix.  The auxiliary procedures "(<code>'index-rotate)", "(<code>'index-first)",  "(<code>'index-last)", and "(<code>'index-swap)" create commonly used permutations.")
          (<li> (<a> href:"#array-reverse" (<code>'array-reverse))
@@ -311,7 +312,7 @@ they may have hash tables or databases behind an implementation, or may read the
         (<p> "Certain ways of sharing generalized arrays, however, are relatively easy to code and are not expensive.  If we denote "(<code>"(array-getter "(<var>'A)")")" by "(<code>(<var>'A_))", then if "(<code>(<var>'B))" is the result of "(<code>'array-extract)" applied to "(<code>(<var>'A))", then "
              (<code>"(array-getter "(<var>'B)")")" is simply "(<code>(<var>'A_))".  Similarly, if "(<code>(<var>'A))" is a two-dimensional array, and "(<code>(<var>'B))" is derived from "(<code>(<var>'A))" by applying the permutation $\\pi((i,j))=(j,i)$, then "(<code>"(array-getter "(<var>'B)")")" is "
              (<code>"(lambda (i j) ("(<var>'A_)" j i))")".  Translation and currying also lead to transformed arrays whose getters are relatively efficiently derived from "(<code>(<var>'A_))", at least for arrays of small dimension.")
-        (<p> "Thus, while we do not provide for sharing of generalized arrays for general one-to-one affine maps $T$, we do allow it for the specific procedures "(<code>'array-extract)", "(<code>'array-translate)", "(<code>'array-permute)",  "
+        (<p> "Thus, while we do not provide for sharing of generalized arrays for general one-to-one affine maps $T$, we do allow it for the specific procedures "(<code>'array-extract)", "(<code>'array-translate)", "(<code>'array-rebase)", "(<code>'array-permute)",  "
              (<code>'array-curry)",  "(<code>'array-reverse)", "(<code>'array-tile)", and "(<code>'array-sample)",  and we provide relatively efficient implementations of these procedures for arrays of dimension no greater than four.")
         (<h3> (<a> id: "convention" "Notational convention"))
         (<p> "If "(<code>(<var>'A))" is an array, then we generally define "(<code>(<var>'A_))" to be "(<code>"(array-getter "(<var>'A)")")" and  "(<code>(<var>'A!))" to be "(<code>"(array-setter "(<var>'A)")")".  The latter notation is motivated by the general Scheme convention that the names of procedures that modify the contents of data structures end in "(<code>(<var>"!"))", while the notation for the getter of an array is motivated by the TeX notation for subscripts.  See particularly the "(<a> href: "#Haar" "Haar transform")" example.")
@@ -377,6 +378,7 @@ they may have hash tables or databases behind an implementation, or may read the
                  (<a> href: "#interval-dilate" "interval-dilate")END
                  (<a> href: "#interval-intersect" "interval-intersect")END
                  (<a> href: "#interval-translate" "interval-translate")END
+                 (<a> href: "#interval-rebase" "interval-rebase")END
                  (<a> href: "#interval-permute" "interval-permute") END
                  (<a> href: "#interval-scale" "interval-scale") END
                  (<a> href: "#interval-cartesian-product" "interval-cartesian-product")
@@ -435,6 +437,7 @@ they may have hash tables or databases behind an implementation, or may read the
                  (<a> href: "#array-extract" "array-extract") END
                  (<a> href: "#array-tile" "array-tile") END
                  (<a> href: "#array-translate" "array-translate")END
+                 (<a> href: "#array-rebase" "array-rebase")END
                  (<a> href: "#array-permute" "array-permute")END
                  (<a> href: "#array-reverse" "array-reverse")END
                  (<a> href: "#array-sample" "array-sample")END
@@ -847,9 +850,18 @@ lower bounds $\\ell_0+T_0,\\dots,\\ell_{d-1}+T_{d-1}$ and
 upper bounds $u_0+T_0,\\dots,u_{d-1}+T_{d-1}$.
 It is an error if the arguments do not satisfy these conditions.")
 (<p> "One could define "(<code> "(interval-translate interval translation)")" by "(<code> "(interval-dilate interval translation translation)")".")
-        (<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(2 5) '#(10 7)))
+(<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(2 5) '#(10 7)))
       (B (make-interval '#(1 6) '#(9 8))))
   (interval= (interval-translate A '#(-1 1)) B))  ;; => #t"))
+
+(format-lambda-list '(interval-rebase interval #\[ lower-bounds #\]))
+(<p> "Assumes that "(<code>(<var>'interval))" is an interval and "(<code>(<var>'lower-bounds))", if given, is a vector of exact integers whose length is the same as the dimension of the first argument. "(<code>'interval-rebase)" returns a new interval which is "(<code>(<var>'interval))" translated to have lower bounds given by "(<code>(<var>'lower-bounds))".  It is an error if the arguments do not satisfy these conditions.")
+(<p> (<b>"Example: "))
+(<pre>"(let ((A (make-interval '#(2 5) '#(10 7)))
+      (B (make-interval '#(1 6) '#(9 8)))
+      (C (make-interval '#(0 0) '#(8 2))))
+  (interval= (interval-rebase A '#(1 6)) B)  ;; => #t
+  (interval= (interval-rebase A) C))         ;; => #t")
 
 (format-lambda-list '(interval-permute interval permutation))
 (<p> "Assumes that "(<code>(<var>'interval))" is an interval and "(<code>(<var>'permutation))" is a permutation with the same dimension as "(<code>(<var>'interval))".  It is an error if the arguments do not satisfy these conditions.")
@@ -1247,22 +1259,26 @@ if "(<code>(<var> 'array))" is not a mutable array.")
 (<pre>(<code>
 "(pretty-print
  (array->list*
-  (specialized-array-reshape           ;; Reshape to a zero-dimensional array
-   (make-specialized-array-from-data   ;; The basic one-dimensional array
+  (specialized-array-reshape           ;; Reshape to zero dimensions
+   (make-specialized-array-from-data   ;; The one-dimensional array
     (vector 'foo))
    (make-interval '#()))))"))
 (<p> "prints simply")
 (<pre>(<code>'foo))
 
 (<p> (<b> "Example: ")"In the sample implementation, if you want to construct a $3\\times3$ array with storage class "(<code>'u1-storage-class)" from a length-one "(<code>'u16vector)" named "(<code>(<var>'board))" then one could write")
-(<pre>(<code>"(let* ((board (u16vector #b111100110111))
-       (A (specialized-array-reshape           ;; Reshape to a 3x3 array
-           (array-extract                      ;; Only the first 9 elements
-            (make-specialized-array-from-data  ;; The basic one-dimensional array
-             board u1-storage-class)
-            (make-interval '#(9)))
-           (make-interval '#(3 3))))
-       (B (list->array (make-interval '#(3 3)) ;; Another array with same elements
+(<pre>(<code>
+"(let* ((board
+        (u16vector #b111100110111))
+       (A
+        (specialized-array-reshape           ;; Reshape to a 3x3 array
+         (array-extract                      ;; Only the first 9 elements
+          (make-specialized-array-from-data  ;; A one-dimensional array
+           board u1-storage-class)
+          (make-interval '#(9)))
+         (make-interval '#(3 3))))
+       (B                                    ;; An array with same elements
+        (list->array (make-interval '#(3 3))
                        '(1 1 1
                          0 1 1
                          0 0 1)
@@ -1542,9 +1558,9 @@ of whose elements is itself an (immutable) array and ")
                      (iota (array-dimension a)))))
     (lambda (ones rest)
       (car (array->list
-            (array-curry                           ;; this array has exactly one element
-             (array-permute
-              a (list->vector (append ones rest))) ;; put all length-one axes at beginning
+            (array-curry      ;; this array has exactly one element
+             (array-permute   ;; put all length-one axes at beginning
+              a (list->vector (append ones rest)))
              (length rest)))))))
 
 (array->list* (array-squeeze (make-array (make-interval '#(1 2 1 2)) list)))
@@ -1563,20 +1579,23 @@ of whose elements is itself an (immutable) array and ")
 (array-dimension
  (array-squeeze
   (make-array (make-interval '#(1 2 3 4) '#(2 3 4 5))
-              (lambda args (apply string-append (map number->string args))))))
+              (lambda args
+                (apply string-append (map number->string args))))))
 =>
 0
 
 (array->list*
  (array-squeeze
   (make-array (make-interval '#(1 2 3 4) '#(3 3 4 5))
-              (lambda args (apply string-append (map number->string args))))))
+              (lambda args
+                (apply string-append (map number->string args))))))
 =>
 (\"1234\" \"2234\")
 (array-dimension
  (array-squeeze
   (make-array (make-interval '#(1 2 3 4) '#(3 3 4 5))
-              (lambda args (apply string-append (map number->string args))))))
+              (lambda args
+                (apply string-append (map number->string args))))))
 =>
 1"))
 
@@ -1742,6 +1761,37 @@ B:
  2 -3 => (1 0)
  2 -2 => (1 1)
  2 -1 => (1 2)"))
+
+(format-lambda-list '(array-rebase array #\[ lower-bounds #\]))
+(<p> "Assumes that "(<code>(<var>'array))" is an array and "(<code>(<var>'lower-bounds))", if given, is a vector of exact integers, and that the dimension of the array and the length of the vector are the same. If "(<code>(<var>'lower-bounds))" is not given, it is assumed to have all zero components.  It is an error if "(<code>(<var>'array))" and "(<code>(<var>'lower-bounds))" do not satisfy these conditions.")
+(<p> (<code>'array-rebase)" returns"
+(<pre>"(let ((translation
+       (vector-map -
+                   lower-bounds
+                   (interval-lower-bounds->vector
+                    (array-domain array)))))
+  (array-translate array translation))"))
+(<p> "It is an error if the arguments do not satisfy these conditions.")
+
+(<p>(<b> "Example: "))(<pre>(<code>"(let* ((A (make-array (make-interval '#(1 1) '#(2 3)) list))
+       (B (array-rebase A '#(4 3)))
+       (C (array-rebase A)))
+  (display \"A:\\n\")
+  (array-unveil A)
+  (display \"B:\\n\")
+  (array-unveil B)
+  (display \"C:\\n\")
+  (array-unveil C))"))
+(<p>"displays:")
+(<pre>(<code>"A:
+ 1 1 => (1 1)
+ 1 2 => (1 2)
+B:
+ 4 3 => (1 1)
+ 4 4 => (1 2)
+C:
+ 0 0 => (1 1)
+ 0 1 => (1 2)"))
 
 (format-lambda-list '(array-permute array permutation))
 (<p> "Assumes that "(<code>(<var>'array))" is an array and "(<code>(<var>'permutation))" is a permutation, and that the dimensions of the array and the permutation are the same. The resulting array will have domain "(<code>"(interval-permute (array-domain array) permutation)")".")
@@ -1964,11 +2014,14 @@ B:
 (<p> "Implements the outer product of "(<code>(<var>'array1))" and "(<code>(<var>'array2))" with the operator "(<code>(<var>'operator))", similar to the APL function with the same name.")
 (<p> "Assumes that "(<code>(<var>'array1))" and "(<code>(<var>'array2))" are arrays and that "(<code>(<var>'operator))" is a procedure of two arguments.  "(<code>(<var>'array-outer-product))" returns the immutable array")
 (<pre>(<code>
-"(make-array (interval-cartesian-product (array-domain array1)
-                                        (array-domain array2))
-            (lambda args
-              (operator (apply (array-getter array1) (take args (array-dimension array1)))
-                        (apply (array-getter array2) (drop args (array-dimension array1))))))"))
+       "(make-array
+ (interval-cartesian-product (array-domain array1)
+                             (array-domain array2))
+ (lambda args
+   (operator (apply (array-getter array1)
+                    (take args (array-dimension array1)))
+             (apply (array-getter array2)
+                    (drop args (array-dimension array1))))))"))
 (<p> "This operation can be considered a partial inverse to "(<code>'array-curry)".  It is an error if the arguments do not satisfy these assumptions.")
 (<p> (<b> "Note: ")"You can see from the above definition that if "(<code>(<var>'C))" is "(<code>"(array-outer-product "(<var>'operator)" "(<var>'A)" "(<var>'B)")")", then each call to "(<code>"(array-getter "(<var>'C)")")
      " will call "(<code>(<var>'operator))" as well as "(<code>"(array-getter "(<var>'A)")")" and "(<code>"(array-getter "(<var>'B)")")".  This means that if all elements of "(<code>(<var>'C))" are eventually accessed, then "
@@ -2345,9 +2398,10 @@ B:
                       (list len))
                      (else
                       (let* ((sublists
-                              (map (lambda (l)
-                                     (check-nested-list (fx- dimension 1) l))
-                                   nested-data))
+                              (map
+                               (lambda (l)
+                                 (check-nested-list (fx- dimension 1) l))
+                               nested-data))
                              (first
                               (car sublists)))
                         (and first
@@ -2482,9 +2536,10 @@ B:
                     (list len))
                    (else
                     (let* ((sublists
-                            (vector-map (lambda (l)
-                                          (check-nested-vector (fx- dimension 1) l))
-                                        nested-data))
+                            (vector-map
+                             (lambda (l)
+                               (check-nested-vector (fx- dimension 1) l))
+                             nested-data))
                            (first
                             (vector-ref sublists 0)))
                       (and first
@@ -2579,8 +2634,9 @@ A after assignment:
   (let (("(<var>'lowers)" (interval-lower-bounds->list (array-domain (car "(<var>'arrays)"))))
         ("(<var>'uppers)" (interval-upper-bounds->list (array-domain (car "(<var>'arrays)"))))
         ("(<var>'N)" (length "(<var>"arrays")")))
-    (make-interval (list->vector (append (take "(<var>"lowers k")") (cons 0 (drop "(<var>"lowers k")"))))
-                   (list->vector (append (take "(<var>"uppers k")") (cons "(<var>'N)" (drop "(<var>"uppers k")"))))))
+    (make-interval
+     (list->vector (append (take "(<var>"lowers k")") (cons 0 (drop "(<var>"lowers k")"))))
+     (list->vector (append (take "(<var>"uppers k")") (cons "(<var>'N)" (drop "(<var>"uppers k")"))))))
   (let (("(<var>'getters)" (map array-getter "(<var>'arrays)")))
     (lambda indices
       (let (("(<var>'i)" (list-ref "(<var>"indices k")")))
@@ -2712,16 +2768,18 @@ A after assignment:
     (let loop ((arrays arrays)
                (subdividers axis-subdividers))
       (if (null? arrays)
-          ;; we've assigned every array to the appropriate subarray of result
           result
           (let ((array (car arrays)))
-            ;; the lower and upper bounds in the kth axis of the result where we copy the
-            ;; next array
+            ;; the lower and upper bounds in the kth axis of the result
+            ;; where we copy the next array
             (vector-set! lowers k (car subdividers))
             (vector-set! uppers k (cadr subdividers))
-            ;; the translation that aligns the next array with the subarray of the result
-            (vector-set! translation k (- (car subdividers)
-                                          (interval-lower-bound (array-domain array) k)))
+            ;; the translation that aligns the next array with the
+            ;;  subarray of the result
+            (vector-set!
+              translation
+              k (- (car subdividers)
+                   (interval-lower-bound (array-domain array) k)))
             (array-assign!
              (array-extract result (make-interval lowers uppers))
              (array-translate array translation))
@@ -2764,25 +2822,26 @@ A after assignment:
 (<p> "This procedure is an inverse to "(<code>'array-tile)".  It assumes that "(<code>(<var>'AofA))" is a nonempty array of arrays, all of which have the same dimension as "(<code>(<var>'AofA))" itself. It also assumes that, if given, "(<code>(<var>'storage-class))" is a storage class and "(<code>(<var>'mutable?))" is a boolean.")
 (<p> "While ignoring the lower and upper bounds of the element arrays, it assumes that those element arrays have widths (as defined by "(<code>'interval-widths)") that allow them to be packed together in the configuration given by their indices in "(<code>(<var>'AofA))".  We can always do this when "(<code>"(array-dimension "(<var>'AofA)")")" is 1.  Otherwise, assuming that the lower bounds of "(<code>(<var>'AofA))" are zero, we require: ")
 (<pre>(<code>"(every
- (lambda (k)                                        ;; for each coordinate direction
-   (let ((slices                                    ;; the \"slices\"
-                                                    ;; perpendicular to that direction
-          (array-curry (array-permute AofA (index-first (array-dimension AofA) k))
-                       (- (array-dimension AofA) 1))))
+ (lambda (k)                           ;; for each coordinate direction
+   (let ((slices                       ;; the \"slices\"
+                                       ;; perpendicular to that direction
+          (array-curry
+           (array-permute AofA (index-first (array-dimension AofA) k))
+           (- (array-dimension AofA) 1))))
      (array-every
-      (lambda (slice)                               ;; for every slice perpendicular
-                                                    ;; to direction k
-        (let ((slice-kth-width                      ;; the kth interval width of the
-                                                    ;; \"corner\" element
+      (lambda (slice)                  ;; for every slice perpendicular
+                                       ;; to direction k
+        (let ((slice-kth-width         ;; the kth interval width of the
+                                       ;; \"corner\" element
                (interval-width
                 (array-domain
                  (apply (array-getter slice)
                         (make-list (- (array-dimension AofA) 1) 0)))
                 k)))
           (array-every
-           (lambda (a)                              ;; all arrays within that slice
-             (= (interval-width (array-domain a) k) ;; have the same width in the kth
-                                                    ;; direction
+           (lambda (a)                 ;; all arrays within slice have the
+                                       ;; same width in the kth direction
+             (= (interval-width (array-domain a) k)
                 slice-kth-width))
            slice)))
       slices)))
@@ -2795,24 +2854,29 @@ A after assignment:
         (list->vector (iota A_dim)))
        (corner-multi-index
         (make-list (fx- A_dim 1) 0))
-       (slice-offsets       ;; the indices in each direction where the \"cuts\" are
+       (slice-offsets       ;; the indices in the direction of the \"cuts\"
         (vector-map
          (lambda (k)        ;; the direction
            (let* ((pencil   ;; a pencil in that direction
-                   (apply (array-getter (array-curry (array-permute AofA (index-last A_dim k)) 1))
-                          corner-multi-index))
+                   (apply
+                    (array-getter
+                     (array-curry
+                      (array-permute AofA (index-last A_dim k))
+                      1))
+                    corner-multi-index))
                   (pencil_
                    (array-getter pencil))
                   (pencil-size
                    (interval-width (array-domain pencil) 0))
-                  (result   ;; include sum of all kth interval-widths in pencil
+                  (result   ;; sum of all kth interval-widths in pencil
                    (make-vector (fx+ pencil-size 1) 0)))
              (do ((i 0 (fx+ i 1)))
                  ((fx= i pencil-size) result)
                (vector-set! result
                             (fx+ i 1)
                             (fx+ (vector-ref result i)
-                                 (interval-width (array-domain (pencil_ i)) k))))))
+                                 (interval-width (array-domain (pencil_ i))
+                                                 k))))))
          ks))
        (result
         (make-specialized-array
@@ -2822,8 +2886,8 @@ A after assignment:
                       slice-offsets))
          storage-class
          (storage-class-default storage-class))))
-  ;; We copy the elements from each input array block to the corresponding block
-  ;; in the result array.
+  ;; We copy the elements from each input array block to the
+  ;; corresponding block in the result array.
   (interval-for-each
    (lambda multi-index
      (let* ((vector-multi-index
@@ -2835,18 +2899,11 @@ A after assignment:
                          ks))
             (subarray
              (apply array-ref AofA multi-index))
-            (translated-subarray  ;; translate the subarray to corner
-             (array-translate
-              subarray
-              (vector-map -
-                          corner
-                          (interval-lower-bounds (array-domain subarray))))))
-       (array-assign! (array-extract result (array-domain translated-subarray))
-                      translated-subarray)))
-   (array-domain AofA))
-  (if (not mutable?)
-      (%%array-freeze! result) ;; an internal library procedure
-      result))"))
+            (rebased-subarray  ;; translate the subarray to corner
+             (array-rebase subarray corner)))
+       (array-assign! (array-extract result (array-domain rebased-subarray))
+                      rebased-subarray)))
+   (array-domain AofA)))"))
 (<p> "Any missing optional arguments are assigned the values "(<code>'generic-storage-class)" and "(<code>"(specialized-array-default-mutable?)")", respectively.")
 (<p> "It is an error if the arguments do not satisfy these assumptions, or if all elements of the result cannot by manipulated by the given storage class.")
 (<p>(<b> "Examples: "))
@@ -2867,17 +2924,19 @@ A after assignment:
   #(2 3 5 9 10 11)
   #(12 13 14 15 16 17))
 
-(array-block (list*->array
-              2
-              (list (list (list*->array 2 '((0 1)
-                                            (2 3)))
-                          (list*->array 2 '((4)
-                                            (5)))
-                          (list*->array 2 '((6 7)            ;; these should each have ...
-                                            (9 10))))        ;; three elements ...
-                    (list (list*->array 2 '((12 13)))
-                          (list*->array 2 '((14)))
-                          (list*->array 2 '((15 16 17))))))) ;; to match this array
+(array-block
+ (list*->array
+  2
+  (list
+   (list (list*->array 2 '((0 1)
+                           (2 3)))
+         (list*->array 2 '((4)
+                           (5)))
+         (list*->array 2 '((6 7)            ;; these should each have ...
+                           (9 10))))        ;; three elements to match ...
+   (list (list*->array 2 '((12 13)))
+         (list*->array 2 '((14)))
+         (list*->array 2 '((15 16 17))))))) ;; this array
 => error"))
 
 (format-lambda-list '(array-ref array #\. multi-index))
@@ -3121,7 +3180,7 @@ in the implementation are "(<code>"define-structure")", "(<code>"define-macro")"
        (<td> "block"))
  (<tr> (<td> "array-map with array-copy, array-copy!, or array-assign!")
        (<td> "Elementwise array operations"))
- (<tr> (<td> "array-translate")
+ (<tr> (<td> "array-translate, array-rebase")
        (<td> "No correspondence (array indices always start at 0)"))
  (<tr> (<td> "array-sample")
        (<td> "array slicing notation"))
