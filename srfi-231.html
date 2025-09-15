@@ -80,6 +80,7 @@
       <li>The implementation no longer specifies, or implements, a difference between &quot;safe&quot; and &quot;unsafe&quot; arrays.  The getters and setters of all arrays made in the library check array indices for correctness; the setters of mutable specialized arrays check that the values they store into arrays are of the correct type.  So arguments that specify whether array results are &quot;safe&quot; or &quot;unsafe&quot; have been removed, as well as the parameter <code>specialized-array-default-safe?</code>.</li>
       <li><code>array-freeze!</code> has been removed.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly &quot;freeze&quot; a mutable array to make an immutable array.</li>
       <li><code>(array-rebase array lower-bounds)</code> and <code>(interval-rebase interval lower-bounds)</code> have been added to the SRFI.  <code>array-rebase</code> and <code>interval-rebase</code> translate an array or interval, respectively, so that it has lower bounds specified by the optional second argument.  If the second argument is omitted, then the array or interval is translated so that its lower bounds are all zero.</li>
+      <li>The default entry for arrays of generic-storage-class is now 0, not <code>#f</code>, which we find to be more useful.</li>
     </ul>
     <h2><a id="Overview">Overview</a></h2>
     <h3><a id="Introductory">Introductory remarks</a></h3>
@@ -764,7 +765,7 @@
                       make-vector
                       vector-copy!
                       vector-length
-                      #f
+                      0
                       vector?
                       values))</code></pre>
     <p>In the sample implementation <code>char-storage-class</code> is defined as</p>

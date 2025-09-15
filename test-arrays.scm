@@ -1048,7 +1048,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (let ((test-values
        (list ;;       storae-class   default other data
-        (list generic-storage-class  #f 'a 1 #\c)
+        (list generic-storage-class  0 'a 1 #\c)
         (list    char-storage-class  '#\null '#\a '#\b)
         (list      u1-storage-class  0 1)
         (list      u8-storage-class  0 23)

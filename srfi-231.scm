@@ -132,6 +132,7 @@ MathJax.Hub.Config({
          (<li> "The implementation no longer specifies, or implements, a difference between \"safe\" and \"unsafe\" arrays.  The getters and setters of all arrays made in the library check array indices for correctness; the setters of mutable specialized arrays check that the values they store into arrays are of the correct type.  So arguments that specify whether array results are \"safe\" or \"unsafe\" have been removed, as well as the parameter "(<code> "specialized-array-default-safe?")".")
          (<li> (<code>'array-freeze!)" has been removed.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly \"freeze\" a mutable array to make an immutable array.")
          (<li> (<code>"(array-rebase array lower-bounds)")" and "(<code>"(interval-rebase interval lower-bounds)")" have been added to the SRFI.  "(<code>'array-rebase)" and "(<code>'interval-rebase)" translate an array or interval, respectively, so that it has lower bounds specified by the optional second argument.  If the second argument is omitted, then the array or interval is translated so that its lower bounds are all zero.")
+         (<li> "The default entry for arrays of generic-storage-class is now 0, not "(<code>'#f)", which we find to be more useful.")
          )
 
         (<h2> (<a> id: "Overview" "Overview"))
@@ -981,7 +982,7 @@ the backing store are of some \"type\", either heterogeneous (all Scheme types) 
                       make-vector
                       vector-copy!
                       vector-length
-                      #f
+                      0
                       vector?
                       values))"))
 (<p> "In the sample implementation "(<code> 'char-storage-class)" is defined as")
