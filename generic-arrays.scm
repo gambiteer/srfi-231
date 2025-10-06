@@ -60,13 +60,13 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; where l_i < u_i for 0 <= i < n, and n >= 0 is the dimension of the interval
 
 (define-type %%interval
-  id: 63374ab5-06fa-4d43-8c74-dd46f75ff7b5
+  id: 3187fe91-3971-49e2-bf40-138db94b450b
   copier: #f
   no-functional-setter:
-  (dimension read-only:)                  ;; a fixnum
-  (%%volume read-write: equality-skip:)   ;; #f or an exact integer, calculated when needed
-  (lower-bounds read-only:)               ;; a vector of exact integers l_0,...,l_n-1
-  (upper-bounds read-only:)               ;; a vector of exact integers u_0,...,u_n-1
+  (dimension read-only:)         ;; a fixnum
+  (volume  read-only:)           ;; a nonnegative exact integer
+  (lower-bounds read-only:)      ;; a vector of exact integers l_0,...,l_n-1
+  (upper-bounds read-only:)      ;; a vector of exact integers u_0,...,u_n-1
   )
 
 
@@ -186,13 +186,24 @@ OTHER DEALINGS IN THE SOFTWARE.
       (vector-ref %%vector-of-zeros dimension)
       (make-vector dimension 0)))
 
+(define %%zero-dimensional-interval
+  (make-%%interval 0      ;; dimension
+                   1      ;; %%volume
+                   '#()   ;; lowers
+                   '#())) ;; uppers
+
 (define (%%finish-interval lower-bounds upper-bounds)
   ;; Requires that lower-bounds and upper-bounds are not user visible and therefore
   ;; not user modifiable.
-  (make-%%interval (vector-length upper-bounds)
-                   #f
-                   lower-bounds
-                   upper-bounds))
+  (if (eqv? (vector-length upper-bounds) 0)
+      %%zero-dimensional-interval
+      (make-%%interval (vector-length upper-bounds) ;; dimension
+                       (do ((i (fx- (vector-length upper-bounds) 1) (fx- i 1))
+                            (volume 1 (* volume (- (vector-ref upper-bounds i)
+                                                   (vector-ref lower-bounds i)))))
+                           ((fx< i 0) volume))
+                       lower-bounds
+                       upper-bounds)))
 
 (define make-interval
   (case-lambda
@@ -337,26 +348,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (%%interval-empty? interval)
   (eqv? (%%interval-volume interval) 0))
 
-(define (%%interval-volume interval)
-  (or (%%interval-%%volume interval)
-      (%%compute-interval-volume interval)))
-
 (declare (not inline))
-
-(define (%%compute-interval-volume interval)
-  (let* ((upper-bounds
-          (%%interval-upper-bounds interval))
-         (lower-bounds
-          (%%interval-lower-bounds interval))
-         (dimension
-          (%%interval-dimension interval))
-         (volume
-          (do ((i (fx- dimension 1) (fx- i 1))
-               (result 1 (* result (- (vector-ref upper-bounds i)
-                                      (vector-ref lower-bounds i)))))
-              ((fx< i 0) result))))
-    (%%interval-%%volume-set! interval volume)
-    volume))
 
 (define (index-rotate n k)
   (cond ((not (and (fixnum? n)
@@ -710,6 +702,71 @@ OTHER DEALINGS IN THE SOFTWARE.
                (apply error "interval-intersect: Not all arguments have the same dimension: " intervals))
               (else
                (%%interval-intersect intervals))))))
+
+(define (%%interval-insert-axis interval k u_k)
+  (let ((lowers (%%interval-lower-bounds->list interval))
+        (uppers (%%interval-upper-bounds->list interval)))
+    (%%finish-interval (list->vector (append (take lowers k) (cons 0   (drop lowers k))))
+                       (list->vector (append (take uppers k) (cons u_k (drop uppers k)))))))
+
+(define (interval-insert-axis interval k #!optional (u_k 1))
+  (cond ((not (and (exact-integer? u_k) (positive? u_k)))
+         (error "interval-insert-axis: The third argument is not a positive exact integer: " interval k u_k))
+        ((not (interval? interval))
+         (error "interval-insert-axis: The first argument is not an interval: " interval k))
+        ((not (and (exact-integer? k)
+                   (<= 0 k (interval-dimension interval))))
+         (error "interval-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): "
+                interval k))
+        (else
+         (%%interval-insert-axis interval k u_k))))
+
+(define (%%compute-broadcast-interval intervals)
+  (let* ((max-dim
+          (apply fxmax (map %%interval-dimension intervals)))
+         (indices
+          (iota max-dim))
+         (intervals   ;; add axes to the left with lower bound 0 and upper bound 1
+          (map (lambda (interval)
+                 (%%interval-cartesian-product
+                  (list (make-interval (make-vector (fx- max-dim (%%interval-dimension interval)) 1))
+                        interval)))
+               intervals))
+         (lower-bounds
+          (%%interval-lower-bounds (car intervals)))
+         (max-upper-bounds
+          (list->vector
+           (map (lambda (k)
+                  (apply max (map (lambda (interval)
+                                    (%%interval-upper-bound interval k))
+                                  intervals)))
+                indices))))
+    (and (every (lambda (interval)
+                  (equal? (%%interval-lower-bounds interval) lower-bounds))
+                (cdr intervals))
+         (every (lambda (k)
+                  (let ((max-upper-bound (vector-ref max-upper-bounds k))
+                        (lower-bound (vector-ref lower-bounds k)))
+                    (if (eqv? lower-bound 0)
+                        (every (lambda (interval)
+                                 (let ((upper-bound (%%interval-upper-bound interval k)))
+                                   (or (eqv? upper-bound 1)
+                                       (eqv? upper-bound max-upper-bound))))
+                               intervals)
+                        (every (lambda (interval)
+                                 (eqv? (%%interval-upper-bound interval k)
+                                       (vector-ref max-upper-bounds k)))
+                               intervals))))
+                indices)
+         (make-interval lower-bounds max-upper-bounds))))
+
+(define (compute-broadcast-interval intervals)
+  (cond ((not (and (list? intervals)
+                   (not (null? intervals))
+                   (every interval? intervals)))
+         (error "compute-broadcast-interval: The argument is not a nonempty list of intervals: " intervals))
+        (else
+         (%%compute-broadcast-interval intervals))))
 
 (declare (inline))
 
@@ -1554,40 +1611,38 @@ OTHER DEALINGS IN THE SOFTWARE.
     ;; (pp result)
     result))
 
+(macro-make-representation->double f16 10 5 15)
+(macro-make-double->representation f16 10 5 15)
+
 (define f16-storage-class
-  (let ()
-
-    (macro-make-representation->double f16 10 5 15)
-    (macro-make-double->representation f16 10 5 15)
-
-    (make-storage-class
-     ;; getter
-     (lambda (body i)
-       (f16->double (u16vector-ref body i)))
-     ;; setter
-     (lambda (body i obj)
-       (u16vector-set! body i (double->f16 obj)))
-     ;; checker
-     (lambda (obj)
-       (flonum? obj))
-     ;; maker
-     (lambda (n val)
-       (make-u16vector n (double->f16 val)))
-     ;; copier
-     u16vector-copy!
-     ;; length
-     (lambda (body)
-       (u16vector-length body))
-     ;; default
-     0.
-     ;; data?
-     (lambda (data)
-       (u16vector? data))
-     ;; data->body
-     (lambda (data)
-       (if (u16vector? data)
-           data
-           (error "Expecting a u16vector passed to (storage-class-data->body f16-storage-class): " data))))))
+  (make-storage-class
+   ;; getter
+   (lambda (body i)
+     (f16->double (u16vector-ref body i)))
+   ;; setter
+   (lambda (body i obj)
+     (u16vector-set! body i (double->f16 obj)))
+   ;; checker
+   (lambda (obj)
+     (flonum? obj))
+   ;; maker
+   (lambda (n val)
+     (make-u16vector n (double->f16 val)))
+   ;; copier
+   u16vector-copy!
+   ;; length
+   (lambda (body)
+     (u16vector-length body))
+   ;; default
+   0.
+   ;; data?
+   (lambda (data)
+     (u16vector? data))
+   ;; data->body
+   (lambda (data)
+     (if (u16vector? data)
+         data
+         (error "Expecting a u16vector passed to (storage-class-data->body f16-storage-class): " data)))))
 
 #|
 
@@ -2475,6 +2530,17 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%list*->array dimension nested-data storage-class mutable?))))
 
+(define (object->array object
+                       #!optional
+                       (storage-class generic-storage-class)
+                       (mutable?      (specialized-array-default-mutable?)))
+  (cond ((not (boolean? mutable?))
+         (error "object->array: The third argument is not a boolean: " object storage-class mutable?))
+        ((not (storage-class? storage-class))
+         (error "object->array: The second argument is not a storage class: "  object storage-class))
+        (else
+         (%%list*->array 0 object storage-class mutable?))))
+
 (define (%%vector*->array dimension nested-vector storage-class mutable?)
 
   (define (shape-error)
@@ -3065,11 +3131,9 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (procedure? new-domain->old-domain))
          (error "specialized-array-share: The third argument is not a procedure: "
                 array new-domain new-domain->old-domain))
-        ((not (<= (%%interval-volume new-domain)
-                  (%%interval-volume (%%array-domain array))))
-         ;; If new-domain->old-domain is a 1-1 map, then the volume of
-         ;; the new-domain must have no more elements than old-domain
-         (error "specialized-array-share: The second argument (a domain) has more elements than the domain of the first argument (an array): " array new-domain new-domain->old-domain))
+        ((and (zero? (%%interval-volume (%%array-domain array)))
+              (positive?  (%%interval-volume new-domain)))
+         (error "specialized-array-share: Sharing an empty array to a nonempty interval: " array new-domain new-domain->old-domain))
         (else
          (%%specialized-array-share array
                                     new-domain
@@ -3658,6 +3722,85 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%mutable-array-sample array scales))
         (else
          (%%immutable-array-sample array scales))))
+
+(define-macro (define-deleters)
+
+  (define (make-symbol . args)
+    (string->symbol
+     (apply string-append
+            (map (lambda (x)
+                   (cond ((string? x) x)
+                         ((symbol? x) (symbol->string x))
+                         ((number? x) (number->string x))))
+                 args))))
+
+  (define (delete-arg args k)
+    (append (take args k)
+            (drop args (+ k 1))))
+
+  (define (make-args n)
+    (map (lambda (j)
+           (make-symbol 'i_ j))
+         (iota n)))
+
+  (define (generate-code-for-fixed-n name transformer n)
+    (let ((args (make-args n)))
+      `((,n)
+        (case k
+          ,@(map (lambda (k)
+                   `((,k)
+                     (lambda ,(transformer args)
+                       (,name ,@(transformer (delete-arg args k))))))
+                 (iota n))))))
+
+  (define (deleter name transformer)
+    `(define (,(make-symbol name '-delete) ,name n k)
+       (case n
+         ,@(map (lambda (n)
+                  (generate-code-for-fixed-n name transformer n))
+                (iota 5 1))
+         (else
+          (lambda ,(transformer 'multi-index)
+            (apply ,name ,@(transformer '((append (take multi-index k)
+                                                  (drop multi-index (fx+ 1 k)))))))))))
+
+  (let ((result
+         `(begin
+            ,(deleter '%%getter values)
+            ,(deleter '%%setter (lambda (args) (cons 'v args))))))
+    #;(pp result)
+    result))
+
+(define-deleters)
+
+(define (%%array-insert-axis array k u_k)
+  (let* ((new-domain
+          (%%interval-insert-axis (%%array-domain array) k u_k))
+         (n
+          (%%interval-dimension new-domain)))
+    (cond ((specialized-array? array)
+           (%%specialized-array-share array
+                                      new-domain
+                                      (%%getter-delete values n k)))
+          ((mutable-array? array)
+           (%%make-safer-array new-domain
+                               (%%getter-delete (%%array-unsafe-getter array) n k)
+                               (%%setter-delete (%%array-unsafe-setter array) n k)))
+          (else
+           (%%make-safer-array new-domain
+                               (%%getter-delete (%%array-unsafe-getter array) n k))))))
+
+(define (array-insert-axis array k #!optional (u_k 1))
+  (cond ((not (and (exact-integer? u_k) (positive? u_k)))
+         (error "array-insert-axis: The third argument is not a positive exact integer: " array k u_k))
+        ((not (array? array))
+         (error "array-insert-axis: The first argument is not an array: " array k))
+        ((not (and (exact-integer? k)
+                   (<= 0 k (array-dimension array))))
+         (error "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): "
+                array k))
+        (else
+         (%%array-insert-axis array k u_k))))
 
 (define (%%array-outer-product combiner A B)
   (let* ((D_A            (%%array-domain A))
@@ -4457,7 +4600,7 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "array-assign!: The source is not an array: " destination source))
         ((not (%%interval= (%%array-domain destination)
                            (%%array-domain source)))
-         (error "array-assign: The destination and source do not have the same domains: " destination source))
+         (error "array-assign!: The destination and source do not have the same domains: " destination source))
         (else
          (%%move-array-elements destination
                                 source
@@ -4512,33 +4655,19 @@ OTHER DEALINGS IN THE SOFTWARE.
                      (%%->specialized-array A storage-class caller))
                    arrays)
               arrays))
-         (first-array
-          (car arrays))
          (number-of-arrays
           (length arrays))
          (domain                         ;; the common domain of all the arrays
-          (%%array-domain first-array))
-         (domain-dimension
-          (%%interval-dimension domain))
-         (lowers
-          (%%interval-lower-bounds->list domain))
-         (uppers
-          (%%interval-upper-bounds->list domain))
-         (result-dimension
-          (fx+ 1 domain-dimension))
+          (%%array-domain (car arrays)))
          (result-domain
-          (%%finish-interval
-           (list->vector (append (take lowers k) (cons 0                (drop lowers k))))
-           (list->vector (append (take uppers k) (cons number-of-arrays (drop uppers k))))))
-         (result-dimension
-          (fx+ 1 domain-dimension))
+          (%%interval-insert-axis domain k number-of-arrays))
          (result-array
           (%%make-specialized-array result-domain
                                     storage-class
                                     (storage-class-default storage-class)))
-         (permuted-and-curried-result
-          (%%array-curry (%%array-permute result-array (%%index-first result-dimension k))
-                         domain-dimension)))
+         (permuted-and-curried-result    ;; result written as a one-dimensional array of slices
+          (%%array-curry (%%array-permute result-array (%%index-first (%%interval-dimension result-domain) k))
+                         (%%interval-dimension domain))))
     ;; copy each array argument to the associated place in stack
     (%%array-for-each (lambda (destination source)
                         (%%move-array-elements destination source caller))

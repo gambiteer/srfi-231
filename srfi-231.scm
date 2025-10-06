@@ -130,9 +130,16 @@ MathJax.Hub.Config({
         (<p> "This SRFI differs from the finalized " (<a> href: "https://srfi.schemers.org/srfi-231/" "SRFI 231")" in the following ways:")
         (<ul>
          (<li> "The implementation no longer specifies, or implements, a difference between \"safe\" and \"unsafe\" arrays.  The getters and setters of all arrays made in the library check array indices for correctness; the setters of mutable specialized arrays check that the values they store into arrays are of the correct type.  So arguments that specify whether array results are \"safe\" or \"unsafe\" have been removed, as well as the parameter "(<code> "specialized-array-default-safe?")".")
-         (<li> (<code>'array-freeze!)" has been removed.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly \"freeze\" a mutable array to make an immutable array.")
-         (<li> (<code>"(array-rebase array lower-bounds)")" and "(<code>"(interval-rebase interval lower-bounds)")" have been added to the SRFI.  "(<code>'array-rebase)" and "(<code>'interval-rebase)" translate an array or interval, respectively, so that it has lower bounds specified by the optional second argument.  If the second argument is omitted, then the array or interval is translated so that its lower bounds are all zero.")
+         (<li> (<code>'array-freeze!)" has been removed as a user-visible procedure.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly \"freeze\" a mutable array to make an immutable array.")
          (<li> "The default entry for arrays of generic-storage-class is now 0, not "(<code>'#f)", which we find to be more useful.")
+         (<li> "The routines "
+               (<a> href: "#interval-rebase" (<code>'interval-rebase))", "
+               (<a> href: "#array-rebase" (<code>'array-rebase))", "
+               (<a> href: "#interval-insert-axis" (<code>'interval-insert-axis))", "
+               (<a> href: "#object-rarrow-array" (<code>'object->array))", "
+               (<a> href: "#array-insert-axis" (<code>'array-insert-axis))", "
+               (<a> href: "#compute-broadcast-interval" (<code>'compute-broadcast-interval))
+               " have been added to the SRFI.")
          )
 
         (<h2> (<a> id: "Overview" "Overview"))
@@ -157,6 +164,8 @@ MathJax.Hub.Config({
                ": Reverses the order of rows or columns (or both) of a spreadsheet.  Like flipping an image vertically or horizontally.")
          (<li> (<a> href:"#array-sample" (<code>'array-sample))
                ": Accesses every second (or third, etc.) row or column, or both, of an array.")
+         (<li> (<a> href: "#array-insert-axis" (<code>'array-insert-axis))
+               ": Inserts an axis into its array argument with lower bound 0 and upper bound 1.  Useful for setting up array broadcasting.")
          )
         (<p> "The following two procedures decompose arrays in different ways.  They return "(<i>"generalized arrays")" whose elements are themselves arrays. Like the procedures described immediately above, the resulting subarrays share elements with their argument.")
         (<ul>
@@ -206,6 +215,7 @@ MathJax.Hub.Config({
                (<a> href: "#vector-rarrow-array" (<code>'vector->array))": Either transfer the elements of an array to a list or vector, or construct a specialized array from the elements of a list or vector.")
          (<li> (<a> href: "#array-rarrow-list*" (<code>'array->list*))", "
                (<a> href: "#list*-rarrow-array" (<code>'list*->array))", "
+               (<a> href: "#object->array" (<code>'object->array))", "
                (<a> href: "#array-rarrow-vector*" (<code>'array->vector*))", and "
                (<a> href: "#vector*-rarrow-array" (<code>'vector*->array))": Either transfer the elements of an array to a nested list or vector, or construct a specialized array from the elements of a nested list or vector."))
         (<p>"I hope this brief discussion gives a flavor for the design of this SRFI.")
@@ -378,6 +388,8 @@ they may have hash tables or databases behind an implementation, or may read the
                  (<a> href: "#interval-fold-right" "interval-fold-right")END
                  (<a> href: "#interval-dilate" "interval-dilate")END
                  (<a> href: "#interval-intersect" "interval-intersect")END
+                 (<a> href: "#interval-insert-axis" "interval-insert-axis")END
+                 (<a> href: "#compute-broadcast-interval" "compute-broadcast-interval")END
                  (<a> href: "#interval-translate" "interval-translate")END
                  (<a> href: "#interval-rebase" "interval-rebase")END
                  (<a> href: "#interval-permute" "interval-permute") END
@@ -442,6 +454,7 @@ they may have hash tables or databases behind an implementation, or may read the
                  (<a> href: "#array-permute" "array-permute")END
                  (<a> href: "#array-reverse" "array-reverse")END
                  (<a> href: "#array-sample" "array-sample")END
+                 (<a> href: "#array-insert-axis" "array-insert-axis")END
                  (<a> href: "#array-outer-product" "array-outer-product") END
                  (<a> href: "#array-inner-product" "array-inner-product") END
                  (<a> href: "#array-map" "array-map")END
@@ -455,6 +468,7 @@ they may have hash tables or databases behind an implementation, or may read the
                  (<a> href: "#list-rarrow-array" "list->array") END
                  (<a> href: "#array-rarrow-list*" "array->list*") END
                  (<a> href: "#list*-rarrow-array" "list*->array") END
+                 (<a> href: "#object-rarrow-array" "object->array") END
                  (<a> href: "#array-rarrow-vector" "array->vector") END
                  (<a> href: "#vector-rarrow-array" "vector->array") END
                  (<a> href: "#vector*-rarrow-array" "vector*->array") END
@@ -833,12 +847,50 @@ then "(<code> 'interval-intersect)" returns that intersection; otherwise it retu
   (and (vector-every (lambda (x y) (<= x y)) lower-bounds upper-bounds)
        (make-interval lower-bounds upper-bounds)))"))
 (<p> "It is an error if the arguments are not all intervals with the same dimension.")
-        (<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(2 5) '#(10 7)))
+(<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(2 5) '#(10 7)))
       (B (make-interval '#(0 6) '#(8 11)))
       (C (make-interval '#(2 6) '#(8 7)))
       (D (make-interval '#(1 1))))
   (interval= (interval-intersect A B) C)  ;; => #t
   (interval-intersect A D))               ;; => #f"))
+
+(format-lambda-list '(interval-insert-axis interval k #\[ u_k #\]))
+(<p> "Assumes that "(<code>(<var>'interval))" is an interval, "(<code>(<var>'k))" is an exact integer between 0 and "(<code>"(interval-dimension interval)")", inclusive, and that "(<code>(<var>'u_k))", if given, is a positive exact integer.  If omitted, "(<code>(<var>'u_k))" is assumed to be 1.")
+(<p> "Returns a new interval, copying the upper and lower bounds of "(<code>(<var>'interval))" except that a new "(<code>(<var>'k))"th axis with lower bound 0 and upper bound "(<code>(<var>'u_k))" is inserted among the existing axes of "(<code>(<var>'interval))".")
+(<p>"It is an error if the arguments do not satisfy these assumptions.")
+(<p>(<b> "Example: ")(<pre>(<code>"((let ((A (make-interval '#(2 5) '#(10 7)))
+       (B (make-interval '#(2 0 5) '#(10 1 7)))
+       (C (make-interval '#(2 0 5) '#(10 6 7))))
+   (interval= (interval-insert-axis A 1) B)    ;; => #t
+   (interval= (interval-insert-axis A 1 6) C))   ;; => #t")))
+
+(format-lambda-list '(compute-broadcast-interval Is))
+(<p> "Assumes that "(<code>(<var>'Is))" is a nonnull list of intervals.")
+(<p> "If we interpret the argument as the domains of a list of arrays, then this routine computes the domain of the result of \"broadcasting\" those arrays.  This is accomplised in the following steps:")
+(<ol>
+ (<li> "If we denote the maximum of the dimensions of the intervals in "(<code>(<var>'Is))" by $D$, then each interval "(<code>(<var>'I))" in "(<code>(<var>'Is))" has axes added to the left with "(<code>"(interval-insert-axis I 0)")" until its dimension is $D$; call the resulting list of intervals "(<code>(<var>'I*s))".")
+ (<li> "If the intervals in "(<code>(<var>'I*s))" do not all have the same lower bounds, "(<code>'compute-broadcast-interval)" returns "(<code>'#f)".")
+ (<li> "Otherwise, for each axis "(<code>(<var>'k))" of the intervals in "(<code>(<var>'I*s))" we compute the maximum of "(<code>"(interval-upper-bound I* k)")" over all intervals "(<code>(<var>'I*))" in "(<code>(<var>'I*s))" and denote it by $M_k$.")
+ (<li> "For each axis "(<code>(<var>'k))" and for each "(<code>(<var>'I*))" in "(<code>(<var>'I*s))", we check the following: If the common "(<code>(<var>'k))"th lower bound is nonzero, then the values of "(<code>"(interval-upper-bound I* k)")" are all equal; otherwise, "(<code>"(interval-upper-bound I* k)")" is either 1 or $M_k$. If this is false, we return "(<code>'#f)", otherwise we return an interval with the common lower bounds and upper bounds $M_k$ for each "(<code>(<var>'k))"."))
+
+(<p> (<b>"Examples: ")(<pre>(<code>"(let ((I~s (list (make-interval '#(1 2) '#(2 4))
+                 (make-interval '#(2 4))))
+      (I*s (list (make-interval '#(0 0 1)
+                                '#(1 4 2))
+                 (make-interval '#(0 0 1)
+                                '#(3 1 2))))
+      (I^s (list (make-interval '#(0 0 1)
+                                '#(3 1 2))
+                 (make-interval '#(0 0 1)
+                                '#(4 4 2))))
+      (I&s (list (make-interval     '#(3))
+                 (make-interval '#(100 3)))))
+  (compute-broadcast-interval I~s) ;; => #f, fails (2)
+  (compute-broadcast-interval I*s) ;; => (make-interval '#(0 0 1) '#(3 4 2))
+  (compute-broadcast-interval I^s) ;; => #f, fails (4)
+  (compute-broadcast-interval I&s));; => (make-interval '#(100 3))")))
+
+(<p>(<b> "Note: ")"We add new axes to the left, as does NumPy; Mathematica adds axes on the right.")
 
 (format-lambda-list '(interval-translate interval translation))
 (<p> "Assumes that "(<code>(<var> 'interval))" is an interval, with, e.g.,
@@ -1010,6 +1062,17 @@ manipulate exact integer values between -2"(<sup>(<var> 'X)"-1")" and
 (<h2> (<a> id: "Arrays" "Arrays"))
 (<p> "Arrays are a data type distinct from other Scheme data types.")
 (<p> "In the examples we use a procedure "(<code>'array-unveil)" that lists the multi-indices and elements of an array in lexicographical order: ")
+#;
+(define (array-unveil A)
+  (let ((D_A (array-domain A))
+        (A_  (array-getter A)))
+    (interval-for-each (lambda args
+                         (for-each (lambda (arg)
+                                     (display #\space) (display arg))
+                                   args)
+                         (for-each display
+                                   (list " => " (apply A_ args) #\newline)))
+                       D_A)))
 (<pre>(<code>"(define (array-unveil A)
   (let ((D_A (array-domain A))
         (A_  (array-getter A)))
@@ -2010,6 +2073,84 @@ B:
  1 0 => (2 0)
  1 1 => (2 1)"))
 
+(format-lambda-list '(array-insert-axis A k #\[ u_k #\]))
+(<p> "Assumes that "(<code>(<var>'A))" is an array, "(<code>(<var>'k))" is an exact integer between 0 and "(<code>"(array-dimension A)")", inclusive, and "(<code>(<var>'u_k))", if given, is a positive exact integer; if "(<code>(<var>'u_k))" is not given it is assumed to be 1.")
+(<p> "Let us define the following procedure: ")
+(<pre>(<code>"(define (process-args args)
+  (append (take args k) (drop args (+ k 1))))"))
+(<p>"If "(<code>(<var>'A))" is specialized, then "(<code>'array-insert-axis)" returns:")
+(<p>(<pre>(<code>"(specialized-array-share A
+                         (interval-insert-axis A k u_k)
+                         (lambda args (apply values (process-args args))))")))
+(<p> "Otherwise, if "(<code>(<var>'A))" is mutable, the procedure returns:")
+(<pre>(<code>"(make-array (interval-insert-axis A k u_k)
+            (lambda args (apply (array-getter A) (process-args args)))
+            (lambda (v . args) (apply (array-setter A) v (process-args args))))"))
+(<p> "Otherwise, the procedure returns:")
+(<pre>(<code>"(make-array (interval-insert-axis A k u_k)
+            (lambda args (apply (array-getter A) (process-args args)))"))
+(<p> "It is an error if the arguments do not satisfy these assumptions")
+(<p> (<b> "Note: ")"The procedure "(<code>'process-args)" defines an affine transform on its arguments, but because it drops the "(<code>(<var>'k))"th argument, the transform is not one-to-one when "(<code>(<var>'u_k))" is greater than one.  Thus, modifying the element of the resulting array at a specific multi-index may modify elements at other multi-indices.")
+(<p>(<b>"Example: "))
+(<pre>(<code>"(let* ((A (list->array (make-interval '#(2 3)) (iota 6)))
+       (A* (array-insert-axis A 1 2)))
+  (display \"A:\") (newline)
+  (array-unveil A)
+  (display \"insert axis 0:\") (newline)
+  (array-unveil (array-insert-axis A 0 2))
+  (display \"insert axis 1:\") (newline)
+  (array-unveil (array-insert-axis A 1 2))
+  (display \"insert axis 2:\") (newline)
+  (array-unveil (array-insert-axis A 2 2)))"))
+(<p>"displays: ")
+(<pre>(<code>"A:
+ 0 0 => 0
+ 0 1 => 1
+ 0 2 => 2
+ 1 0 => 3
+ 1 1 => 4
+ 1 2 => 5
+insert axis 0:
+ 0 0 0 => 0
+ 0 0 1 => 1
+ 0 0 2 => 2
+ 0 1 0 => 3
+ 0 1 1 => 4
+ 0 1 2 => 5
+ 1 0 0 => 0
+ 1 0 1 => 1
+ 1 0 2 => 2
+ 1 1 0 => 3
+ 1 1 1 => 4
+ 1 1 2 => 5
+insert axis 1:
+ 0 0 0 => 0
+ 0 0 1 => 1
+ 0 0 2 => 2
+ 0 1 0 => 0
+ 0 1 1 => 1
+ 0 1 2 => 2
+ 1 0 0 => 3
+ 1 0 1 => 4
+ 1 0 2 => 5
+ 1 1 0 => 3
+ 1 1 1 => 4
+ 1 1 2 => 5
+insert axis 2:
+ 0 0 0 => 0
+ 0 0 1 => 0
+ 0 1 0 => 1
+ 0 1 1 => 1
+ 0 2 0 => 2
+ 0 2 1 => 2
+ 1 0 0 => 3
+ 1 0 1 => 3
+ 1 1 0 => 4
+ 1 1 1 => 4
+ 1 2 0 => 5
+ 1 2 1 => 5"))
+
+
 
 (format-lambda-list '(array-outer-product operator array1 array2))
 (<p> "Implements the outer product of "(<code>(<var>'array1))" and "(<code>(<var>'array2))" with the operator "(<code>(<var>'operator))", similar to the APL function with the same name.")
@@ -2442,6 +2583,12 @@ B:
  1 1 0 => 10
  1 1 1 => 11
  1 1 2 => 12"))
+
+(format-lambda-list '(object->array object #\[ storage-class #\[ mutable? #\] #\]) 'object-rarrow-array)
+(<p> "The same as "(<code>"(list*->array 0 object [ storage-class [ mutable? ] ])")
+     ", creates a zero-dimensional specialized array that has the object as its sole element.")
+(<p> (<b> "Example: "))
+(<pre>(<code>"((array-getter (object->array 42))) ;; => 42"))
 
 (format-lambda-list '(array->list* array) 'array-rarrow-list*)
 (<p> "Assumes that "(<code>(<var>'array))" is an array, and returns a newly allocated nested list "(<code>(<var>'nested-list))".  If "(<code>(<var>'array))" is nonempty and has positive dimension and we denote the getter of "(<code>(<var>'array))" by "(<code>'array_)", then "(<code>(<var>'nested-list))" and "(<code>'array_)" satisfy")

@@ -32,7 +32,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; A test program for SRFI 231:
 ;;; Intervals and Generalized Arrays
 
-'(begin
+'
+(begin
   ;; Uncomment this line to run test-arrays.scm in Gambit.
   (include "generic-arrays.scm"))
 
@@ -62,7 +63,10 @@ OTHER DEALINGS IN THE SOFTWARE.
     %%array-domain
     %%array-indexer
     %%array-getter
-    %%array-packed?))
+    %%array-packed?
+    %%specialized-array-share
+    f16->double
+    double->f16))
   )
 
 (declare (standard-bindings)(extended-bindings)(block)(not safe) (mostly-fixnum))
@@ -77,32 +81,32 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define failed-tests 0)
 (set! failed-tests failed-tests)
 
-;;; The next macros are not hygienic, so don't call any variable
-;;; "continuation" ...
 
 (define-macro (test expr value)
-  `(let* (;(ignore (pretty-print ',expr))
-          (result (call-with-current-continuation
-                   (lambda (continuation)
-                     (with-exception-catcher
-                      (lambda (args)
-                        (cond ((error-exception? args)
-                               (continuation (error-exception-message args)))
-                              ;; I don't expect any of these, but it sure makes debugging easier
-                              ((unbound-global-exception? args)
-                               (unbound-global-exception-variable args))
-                              ((wrong-number-of-arguments-exception? args)
-                               "Wrong number of arguments passed to procedure ")
-                              (else
-                               "piffle")))
+  (let ((result (gensym 'result))
+        (continuation (gensym 'continuation)))
+    `(let* (#;(ignore (pretty-print ',expr))
+            (,result (call-with-current-continuation
+                      (lambda (,continuation)
+                        (with-exception-catcher
+                         (lambda (args)
+                           (cond ((error-exception? args)
+                                  (,continuation (error-exception-message args)))
+                                 ;; I don't expect any of these, but it sure makes debugging easier
+                                 ((unbound-global-exception? args)
+                                  (unbound-global-exception-variable args))
+                                 ((wrong-number-of-arguments-exception? args)
+                                  "Wrong number of arguments passed to procedure ")
+                                 (else
+                                  "piffle")))
 
-                      (lambda ()
-                        ,expr))))))
-     (set! total-tests (+ total-tests 1))
-     (if (not (equal? result ,value))
-         (begin
-           (set! failed-tests (+ failed-tests 1))
-           (pp (list ',expr" => " result ", not " ,value))))))
+                         (lambda ()
+                           ,expr))))))
+       (set! total-tests (+ total-tests 1))
+       (if (not (equal? ,result ,value))
+           (begin
+             (set! failed-tests (+ failed-tests 1))
+             (pp (list ',expr" => " ,result ", not " ,value)))))))
 
 (define-macro (test-multiple-values expr vals)
   `(call-with-values
@@ -779,7 +783,60 @@ OTHER DEALINGS IN THE SOFTWARE.
     (else
      (error "array-display can't handle > 2 dimensions: " A))))
 
-(pp "storage-class tests")
+;;; round to lower precision
+
+(define (flonum->f32 x)
+  (f32vector-ref (f32vector x) 0))
+
+(define (flonum->f16 x)
+  (f16->double (double->f16 x)))
+
+(define random-storage-class-and-initializer
+  (let* ((storage-classes
+          (vector
+           ;; generic
+           (list generic-storage-class
+                 (lambda args (random-permutation (length args))))
+           ;; signed integer
+           (list s8-storage-class
+                 (lambda args (random (- (expt 2 7)) (- (expt 2 7) 1))))
+           (list s16-storage-class
+                 (lambda args (random (- (expt 2 15)) (- (expt 2 15) 1))))
+           (list s32-storage-class
+                 (lambda args (random (- (expt 2 31)) (- (expt 2 31) 1))))
+           (list s64-storage-class
+                 (lambda args (random (- (expt 2 63)) (- (expt 2 63) 1))))
+           ;; unsigned integer
+           (list u1-storage-class
+                 (lambda args (random (expt 2 1))))
+           (list u8-storage-class
+                 (lambda args (random (expt 2 8))))
+           (list u16-storage-class
+                 (lambda args (random (expt 2 16))))
+           (list u32-storage-class
+                 (lambda args (random (expt 2 32))))
+           (list u64-storage-class
+                 (lambda args (random (expt 2 64))))
+           ;; float
+           (list f16-storage-class
+                 (lambda args (flonum->f16 (test-random-real))))
+           (list f32-storage-class
+                 (lambda args (flonum->f32 (test-random-real))))
+           (list f64-storage-class
+                 (lambda args (test-random-real)))
+           ;; char
+           (list char-storage-class
+                 (lambda args (random-char)))
+           ;; complex-float
+           (list c64-storage-class
+                 (lambda args (make-rectangular (flonum->f32 (test-random-real))
+                                                (flonum->f32 (test-random-real)))))
+           (list c128-storage-class
+                 (lambda args (make-rectangular (test-random-real) (test-random-real))))))
+         (n
+          (vector-length storage-classes)))
+    (lambda ()
+      (vector-ref storage-classes (random n)))))
 
 (define storage-class-names
   (list (list   u1-storage-class   'u1-storage-class 'u16vector make-u16vector)
@@ -807,6 +864,8 @@ OTHER DEALINGS IN THE SOFTWARE.
         char-storage-class
         c64-storage-class c128-storage-class))
 
+
+(pp "storage-class tests")
 
 (for-each (lambda (storage-class)
             (test ((storage-class-data? storage-class)
@@ -1147,6 +1206,55 @@ OTHER DEALINGS IN THE SOFTWARE.
   (for-each display (list "(pad 16 (number->string (u16vector-ref (vector-ref (array-body B) 1) 0) 2)) => " #\newline
                           (pad 16 (number->string (u16vector-ref (vector-ref (array-body B) 1) 0) 2)) #\newline)))
 
+(pp "object->array tests")
+
+(test (object->array 'a 'a 'a)
+      "object->array: The third argument is not a boolean: ")
+
+(test (object->array 'a 'a)
+      "object->array: The second argument is not a storage class: ")
+
+(test (object->array 'a 'a #t)
+      "object->array: The second argument is not a storage class: ")
+
+(do ((i 0 (fx+ i 1)))
+    ((fx= i random-tests))
+
+  (let* ((storage-class-and-initializer
+          (random-storage-class-and-initializer))
+         (storage-class
+          (car storage-class-and-initializer))
+         (initializer
+          (cadr storage-class-and-initializer))
+         (object
+          (initializer 0 1 2 3))
+         (default-mutable?
+           (random-boolean))
+         (mutable?
+          (random-boolean)))
+
+    (parameterize ((specialized-array-default-mutable? default-mutable?))
+
+      (let ((result
+             (object->array object)))
+        (test (array-ref result)           object)
+        (test (array-storage-class result) generic-storage-class)
+        (test (mutable-array? result)      default-mutable?))
+
+      (let ((result
+             (object->array object storage-class)))
+        (test (array-ref result)           object)
+        (test (array-storage-class result) storage-class)
+        (test (mutable-array? result)      default-mutable?))
+
+      (let ((result
+             (object->array object storage-class mutable?)))
+        (test (array-ref result)           object)
+        (test (array-storage-class result) storage-class)
+        (test (mutable-array? result)      mutable?)))))
+
+(next-test-random-source-state!)
+
 (pp "list*->array and vector*->array tests")
 
 ;;; Error tests
@@ -1389,52 +1497,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (array->list* (make-array (make-interval '#(0 2)) error))
       '())
-
-(define random-storage-class-and-initializer
-  (let* ((storage-classes
-          (vector
-           ;; generic
-           (list generic-storage-class
-                 (lambda args (random-permutation (length args))))
-           ;; signed integer
-           (list s8-storage-class
-                 (lambda args (random (- (expt 2 7)) (- (expt 2 7) 1))))
-           (list s16-storage-class
-                 (lambda args (random (- (expt 2 15)) (- (expt 2 15) 1))))
-           (list s32-storage-class
-                 (lambda args (random (- (expt 2 31)) (- (expt 2 31) 1))))
-           (list s64-storage-class
-                 (lambda args (random (- (expt 2 63)) (- (expt 2 63) 1))))
-           ;; unsigned integer
-           (list u1-storage-class
-                 (lambda args (random (expt 2 1))))
-           (list u8-storage-class
-                 (lambda args (random (expt 2 8))))
-           (list u16-storage-class
-                 (lambda args (random (expt 2 16))))
-           (list u32-storage-class
-                 (lambda args (random (expt 2 32))))
-           (list u64-storage-class
-                 (lambda args (random (expt 2 64))))
-           ;; float
-           (list f16-storage-class
-                 (lambda args (test-random-real)))
-           (list f32-storage-class
-                 (lambda args (test-random-real)))
-           (list f64-storage-class
-                 (lambda args (test-random-real)))
-           ;; char
-           (list char-storage-class
-                 (lambda args (random-char)))
-           ;; complex-float
-           (list c64-storage-class
-                 (lambda args (make-rectangular (test-random-real) (test-random-real))))
-           (list c128-storage-class
-                 (lambda args (make-rectangular (test-random-real) (test-random-real))))))
-         (n
-          (vector-length storage-classes)))
-    (lambda ()
-      (vector-ref storage-classes (random n)))))
 
 (pp "array-empty? tests")
 
@@ -2865,7 +2927,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (specialized-array-share (make-specialized-array (make-interval '#(0 0)))
                                (make-interval '#(1))
                                (lambda (i) (values i i)))
-      "specialized-array-share: The second argument (a domain) has more elements than the domain of the first argument (an array): ")
+     "specialized-array-share: Sharing an empty array to a nonempty interval: " )
 
 
 (test (myarray= (list->array (make-interval '#(0) '#(10))
@@ -3530,6 +3592,167 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (next-test-random-source-state!)
 
+(pp "interval-insert-axis and array-insert-axis")
+
+(test (interval-insert-axis 'a 1)
+      "interval-insert-axis: The first argument is not an interval: ")
+
+(test (interval-insert-axis (make-interval '#(1 1)) 'a)
+      "interval-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
+
+(test (interval-insert-axis (make-interval '#(1 1)) -1)
+      "interval-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
+
+(test (interval-insert-axis (make-interval '#(1 1)) 10)
+      "interval-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
+
+(test (interval-insert-axis (make-interval '#(1 1)) 10 'a)
+      "interval-insert-axis: The third argument is not a positive exact integer: ")
+
+(test (interval-insert-axis (make-interval '#(1 1)) 10 1.)
+      "interval-insert-axis: The third argument is not a positive exact integer: ")
+
+(test (interval-insert-axis (make-interval '#(1 1)) 10 0)
+      "interval-insert-axis: The third argument is not a positive exact integer: ")
+
+(define (my-interval-insert-axis interval k #!optional (u_k 1))
+  (let ((uppers (interval-upper-bounds->list interval))
+        (lowers (interval-lower-bounds->list interval)))
+    (make-interval
+     (list->vector (append (take lowers k) (cons   0 (drop lowers k))))
+     (list->vector (append (take uppers k) (cons u_k (drop uppers k)))))))
+
+(do ((i 0 (fx+ i 1)))
+    ((= i random-tests))
+  (let* ((interval (random-interval))
+         (k (random (+ (interval-dimension interval) 1)))
+         (u_k (random 1 10)))
+    (test (interval-insert-axis interval k)
+          (my-interval-insert-axis interval k))
+    (test (interval-insert-axis interval k u_k)
+          (my-interval-insert-axis interval k u_k))))
+
+(next-test-random-source-state!)
+
+(test (array-insert-axis 'a 1)
+      "array-insert-axis: The first argument is not an array: ")
+
+(test (array-insert-axis (make-array (make-interval '#(1 1)) list) 'a)
+      "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
+
+(test (array-insert-axis (make-array (make-interval '#(1 1)) list) -1)
+      "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
+
+(test (array-insert-axis (make-array (make-interval '#(1 1)) list) 10)
+      "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
+
+(test (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 'a)
+      "array-insert-axis: The third argument is not a positive exact integer: ")
+
+(test (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 1.)
+      "array-insert-axis: The third argument is not a positive exact integer: ")
+
+(test (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 0)
+      "array-insert-axis: The third argument is not a positive exact integer: ")
+
+(define (my-array-insert-axis array k #!optional (u_k 1))
+
+  (define (drop-kth-arg args)
+    (append (take args k) (drop args (+ k 1))))
+
+  (let ((new-domain (interval-insert-axis (array-domain array) k u_k)))
+    (cond ((specialized-array? array)
+           (%%specialized-array-share array new-domain (lambda args (apply values (drop-kth-arg args)))))
+          ((mutable-array? array)
+           (make-array new-domain
+                       (lambda args
+                         (apply (array-getter array)   (drop-kth-arg args)))
+                       (lambda (v . args)
+                         (apply (array-setter array) v (drop-kth-arg args)))))
+          (else
+           (make-array new-domain
+                       (lambda args
+                         (apply (array-getter array) (drop-kth-arg args))))))))
+
+(do ((i 0 (fx+ i 1)))
+    ((fx= i random-tests))
+
+  (let* ((storage-class-and-initializer
+          (random-storage-class-and-initializer))
+         (storage-class
+          (car storage-class-and-initializer))
+         (initializer
+          (cadr storage-class-and-initializer))
+         (domain
+          (random-interval))
+         (specialized
+          (array-copy (make-array domain initializer)
+                      storage-class
+                      #t))
+         (immutable-specialized
+          (array-copy specialized
+                      storage-class
+                      #f))
+         (mutable
+          (let ((copy (array-copy specialized)))
+            (make-array domain
+                        (array-getter copy)
+                        (array-setter copy))))
+
+         (immutable
+          (let ((copy (array-copy specialized)))
+            (make-array domain
+                        (array-getter copy))))
+         (k
+          (random (+ (interval-dimension domain) 1))))
+
+    (for-each (lambda (array)
+                (let ((A* (array-insert-axis array k))
+                      (A^ (my-array-insert-axis array k))
+                      (B* (array-insert-axis array k 10))
+                      (B^ (my-array-insert-axis array k 10)))
+                  (for-each (lambda (A)
+                              (test (specialized-array? A)
+                                    (specialized-array? array))
+                              (test (mutable-array? A)
+                                    (mutable-array? array))
+                              (test (array-domain A*)
+                                    (interval-insert-axis domain k))
+                              (test (array-domain A^)
+                                    (interval-insert-axis domain k))
+                              (test (array-domain B*)
+                                    (interval-insert-axis domain k 10))
+                              (test (array-domain B^)
+                                    (interval-insert-axis domain k 10))
+                              (test (myarray= A* A^)
+                                    #t)
+                              (test (myarray= B* B^)
+                                    #t))
+                            (list A* A^ B* B^))
+                  (for-each (lambda (A^)
+                              (array-for-each (lambda (A)
+                                                (test (myarray= array A)
+                                                      #t))
+                                              (array-curry (array-permute A^ (index-first (array-dimension A^) k))
+                                                           (array-dimension array))))
+                            (list A^ B^))))
+              (list specialized immutable-specialized mutable immutable))))
+
+(next-test-random-source-state!)
+
+(pp "compute-broadcast-interval tests")
+
+(test (compute-broadcast-interval 'a)
+      "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+
+(test (compute-broadcast-interval '())
+      "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+
+(test (compute-broadcast-interval '(a))
+      "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+
+;;; I don't know yet how to test compute-broadcast-interval
+
 (pp "test interval-scale and array-sample")
 
 (test (interval-scale 1 'a)
@@ -4038,23 +4261,23 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (array-assign! (array-copy (make-array (make-interval '#(0 0) '#(1 1)) values))
                      (make-array (make-interval '#(0 0) '#(2 1)) values))
-      "array-assign: The destination and source do not have the same domains: ")
+      "array-assign!: The destination and source do not have the same domains: ")
 
 (test (array-assign! (make-array (make-interval '#(1 2)) list list) ;; not valid
                      (make-array (make-interval '#(0 0) '#(2 1)) values))
-      "array-assign: The destination and source do not have the same domains: ")
+      "array-assign!: The destination and source do not have the same domains: ")
 
 (test (array-assign! (array-permute (array-copy (make-array (make-interval '#(2 3))
                                                            list))
                                     '#(1 0))
                      (make-array (make-interval '#(2 3)) list))
-      "array-assign: The destination and source do not have the same domains: ")
+      "array-assign!: The destination and source do not have the same domains: ")
 
 (let ((destination (make-specialized-array (make-interval '#(3 2))))  ;; elements in order
       (source (array-permute (make-array (make-interval '#(3 2)) list) ;; not the same interval, but same volume
                              '#(1 0))))
   (test (array-assign! destination source)
-        "array-assign: The destination and source do not have the same domains: "))
+        "array-assign!: The destination and source do not have the same domains: "))
 
 
 

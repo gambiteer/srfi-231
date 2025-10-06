@@ -24,6 +24,8 @@
     interval-fold-left interval-fold-right
     interval-dilate
     interval-intersect
+    interval-insert-axis
+    compute-broadcast-interval
     interval-translate
     interval-rebase
     interval-permute
@@ -86,6 +88,7 @@
     array-permute
     array-reverse
     array-sample
+    array-insert-axis
     array-outer-product
     array-inner-product
     array-map
@@ -98,6 +101,7 @@
     array->list
     list->array
     list*->array
+    object->array
     array->list*
     array->vector
     vector->array
