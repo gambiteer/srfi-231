@@ -72,14 +72,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; comment one of the following two expressions.
 
-#;
+
 (begin
   (include "mini-arrays.scm")
 
   (define-macro (test-error expr value)
     #t))
 
-
+#;
 (begin
   (include "generic-arrays.scm")
 
@@ -134,15 +134,19 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define test-random-real
   (random-source-make-reals test-random-source))
 
-(define (random a #!optional b)
-  (if b
-      (+ a (test-random-integer (- b a)))
-      (test-random-integer a)))
+(define random
+  (case-lambda
+   ((a)
+    (test-random-integer a))
+   ((a b)
+    (+ a (test-random-integer (- b a))))))
 
-(define (random-inclusive a #!optional b)
-  (if b
-      (+ a (test-random-integer (- b a -1)))
-      (test-random-integer (+ a 1))))
+(define random-inclusive
+  (case-lambda
+   ((a)
+    (test-random-integer (+ a 1)))
+   ((a b)
+    (+ a (test-random-integer (- b a -1))))))
 
 (define (random-char)
   (let ((n (random-inclusive (##max-char-code))))
@@ -151,10 +155,14 @@ OTHER DEALINGS IN THE SOFTWARE.
         (integer->char n)
         (random-char))))
 
-(define (random-sample n #!optional (l 4))
-  (list->vector (map (lambda (i)
-                       (random 1 l))
-                     (iota n))))
+(define random-sample
+  (case-lambda
+   ((n)
+    (random-sample n 4))
+   ((n l)
+    (list->vector (map (lambda (i)
+                         (random 1 l))
+                       (iota n))))))
 
 (define (random-permutation n)
   (let ((result (make-vector n)))
@@ -688,54 +696,45 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (define use-bignum-intervals #f)
 
+(define random-interval
+  (case-lambda
+   (()
+    (random-interval 0 6))
+   ((min max)
+    ;; a random interval with min <= dimension < max
+    ;; positive and negative lower bounds
+    (let* ((lower
+            (map (lambda (x)
+                   (if use-bignum-intervals
+                       (random (- (expt 2 90)) (expt 2 90))
+                       (random -10 10)))
+                 (iota (random min max))))
+           (upper
+            (map (lambda (x)
+                   (+ (random 0 8) x))
+                 lower)))
+      (make-interval (list->vector lower)
+                     (list->vector upper))))))
 
-(define (random-interval #!optional (min 0) (max 6))
-  ;; a random interval with min <= dimension < max
-  ;; positive and negative lower bounds
-  (let* ((lower
-          (map (lambda (x)
-                 (if use-bignum-intervals
-                     (random (- (expt 2 90)) (expt 2 90))
-                     (random -10 10)))
-               (iota (random min max))))
-         (upper
-          (map (lambda (x)
-                 (+ (random 0 8) x))
-               lower)))
-    (make-interval (list->vector lower)
-                   (list->vector upper))))
-
-;;; The next routine is going to be used to generate limited
-;;; random intervals to test array and interval broadcasting.
-
-
-(define (random-skinny-interval #!optional (min 0) (max 6))
-  (let* ((lowers
-          (map (lambda (k)
-                 0)
-               (iota (random min max))))
-         (uppers
-          (map (lambda (l)
-                 (+ l (random 0 4)))
-               lowers)))
-    (make-interval (list->vector lowers)
-                   (list->vector uppers))))
-
-(define (random-nonempty-interval #!optional (min 0) (max 6))
-  ;; a random interval with min <= dimension < max
-  ;; positive and negative lower bounds
-  (let* ((lower
-          (map (lambda (x)
-                 (if use-bignum-intervals
-                     (random (- (expt 2 90)) (expt 2 90))
-                     (random -10 10)))
-               (vector->list (make-vector (random min max)))))
-         (upper
-          (map (lambda (x)
-                 (+ (random 1 8) x))
-               lower)))
-    (make-interval (list->vector lower)
-                   (list->vector upper))))
+(define random-nonempty-interval
+  (case-lambda
+   (()
+    (random-nonempty-interval 0 6))
+   ((min max)
+    ;; a random interval with min <= dimension < max
+    ;; positive and negative lower bounds
+    (let* ((lower
+            (map (lambda (x)
+                   (if use-bignum-intervals
+                       (random (- (expt 2 90)) (expt 2 90))
+                       (random -10 10)))
+                 (vector->list (make-vector (random min max)))))
+           (upper
+            (map (lambda (x)
+                   (+ (random 1 8) x))
+                 lower)))
+      (make-interval (list->vector lower)
+                     (list->vector upper))))))
 
 (define (random-subinterval interval)
   (let* ((lowers (interval-lower-bounds->vector interval))
@@ -745,20 +744,25 @@ OTHER DEALINGS IN THE SOFTWARE.
          (subinterval (make-interval new-lowers new-uppers)))
     subinterval))
 
+(define random-nonnegative-interval
+  (case-lambda
+   (()
+    (random-nonnegative-interval 1 6))
+   ((min max)
+    (let* ((lower
+            (make-vector (random min max) 0))
+           (upper
+            (vector-map (lambda (x) (random 1 7)) lower)))
+      (make-interval lower upper)))))
 
-(define (random-nonnegative-interval #!optional (min 1) (max 6))
-  ;; a random interval with min <= dimension < max
-  ;; positive and negative lower bounds
-  (let* ((lower
-          (make-vector (random min max) 0))
-         (upper
-          (vector-map (lambda (x) (random 1 7)) lower)))
-    (make-interval lower upper)))
-
-(define (random-positive-vector n #!optional (max 5))
-  (vector-map (lambda (x)
-                (random 1 max))
-              (make-vector n)))
+(define random-positive-vector
+  (case-lambda
+   ((n)
+    (random-positive-vector n 5))
+   ((n max)
+    (vector-map (lambda (x)
+                  (random 1 max))
+                (make-vector n)))))
 
 (define (random-boolean)
   (zero? (random 2)))
@@ -911,10 +915,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test-error (make-array (make-interval '#(3) '#(4)) list 1)
             "make-array: The third argument is not a procedure: ")
 
-(define (myarray= array1 array2 #!optional (compare equal?))
-  (and (interval= (array-domain array1)
-                  (array-domain array2))
-       (array-every compare array1 array2)))
+(define myarray=
+  (case-lambda
+   ((array1 array2)
+    (myarray= array1 array2 equal?))
+   ((array1 array2 compare)
+    (and (interval= (array-domain array1)
+                    (array-domain array2))
+         (array-every compare array1 array2)))))
 
 (pp "array-domain and array-getter error tests")
 
@@ -3590,12 +3598,16 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test-error (interval-insert-axis (make-interval '#(1 1)) 10 0)
             "interval-insert-axis: The third argument is not a positive exact integer: ")
 
-(define (my-interval-insert-axis interval k #!optional (u_k 1))
-  (let ((uppers (interval-upper-bounds->list interval))
-        (lowers (interval-lower-bounds->list interval)))
-    (make-interval
-     (list->vector (append (take lowers k) (cons   0 (drop lowers k))))
-     (list->vector (append (take uppers k) (cons u_k (drop uppers k)))))))
+(define my-interval-insert-axis
+  (case-lambda
+   ((interval k)
+    (my-interval-insert-axis interval k 1))
+   ((interval k u_k)
+    (let ((uppers (interval-upper-bounds->list interval))
+          (lowers (interval-lower-bounds->list interval)))
+      (make-interval
+       (list->vector (append (take lowers k) (cons   0 (drop lowers k))))
+       (list->vector (append (take uppers k) (cons u_k (drop uppers k)))))))))
 
 (do ((i 0 (fx+ i 1)))
     ((= i random-tests))
@@ -3630,24 +3642,28 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 0)
             "array-insert-axis: The third argument is not a positive exact integer: ")
 
-(define (my-array-insert-axis array k #!optional (u_k 1))
+(define my-array-insert-axis
+  (case-lambda
+   ((array k)
+    (my-array-insert-axis array k 1))
+   ((array k u_k)
 
-  (define (drop-kth-arg args)
-    (append (take args k) (drop args (+ k 1))))
+    (define (drop-kth-arg args)
+      (append (take args k) (drop args (+ k 1))))
 
-  (let ((new-domain (interval-insert-axis (array-domain array) k u_k)))
-    (cond ((specialized-array? array)
-           (specialized-array-share array new-domain (lambda args (apply values (drop-kth-arg args)))))
-          ((mutable-array? array)
-           (make-array new-domain
-                       (lambda args
-                         (apply (array-getter array)   (drop-kth-arg args)))
-                       (lambda (v . args)
-                         (apply (array-setter array) v (drop-kth-arg args)))))
-          (else
-           (make-array new-domain
-                       (lambda args
-                         (apply (array-getter array) (drop-kth-arg args))))))))
+    (let ((new-domain (interval-insert-axis (array-domain array) k u_k)))
+      (cond ((specialized-array? array)
+             (specialized-array-share array new-domain (lambda args (apply values (drop-kth-arg args)))))
+            ((mutable-array? array)
+             (make-array new-domain
+                         (lambda args
+                           (apply (array-getter array)   (drop-kth-arg args)))
+                         (lambda (v . args)
+                           (apply (array-setter array) v (drop-kth-arg args)))))
+            (else
+             (make-array new-domain
+                         (lambda args
+                           (apply (array-getter array) (drop-kth-arg args))))))))))
 
 (do ((i 0 (fx+ i 1)))
     ((fx= i random-tests))
@@ -4946,49 +4962,53 @@ OTHER DEALINGS IN THE SOFTWARE.
                           (else
                            (error "read-pgm: not a pgm file"))))))))))
 
-(define (write-pgm pgm-data file #!optional force-ascii)
-  (call-with-output-file
-      (list path:          file
-            char-encoding: 'ISO-8859-1
-            eol-encoding:  'lf)
-    (lambda (port)
-      (let* ((greys
-              (pgm-greys pgm-data))
-             (pgm-array
-              (pgm-pixels pgm-data))
-             (domain
-              (array-domain pgm-array))
-             (rows
-              (fx- (interval-upper-bound domain 0)
-                   (interval-lower-bound domain 0)))
-             (columns
-              (fx- (interval-upper-bound domain 1)
-                   (interval-lower-bound domain 1))))
-        (if force-ascii
-            (display "P2" port)
-            (display "P5" port))
-        (newline port)
-        (display columns port) (display " " port)
-        (display rows port) (newline port)
-        (display greys port) (newline port)
-        (array-for-each (if force-ascii
-                            (let ((next-pixel-in-line 1))
-                              (lambda (p)
-                                (write p port)
-                                (if (fxzero? (fxand next-pixel-in-line 15))
-                                    (begin
-                                      (newline port)
-                                      (set! next-pixel-in-line 1))
-                                    (begin
-                                      (display " " port)
-                                      (set! next-pixel-in-line (fx+ 1 next-pixel-in-line))))))
-                            (if (fx< greys 256)
+(define write-pgm
+  (case-lambda
+   ((pgm-data file)
+    (write-pgm pgm-data file #f))
+   ((pgm-data file force-ascii)
+    (call-with-output-file
+        (list path:          file
+              char-encoding: 'ISO-8859-1
+              eol-encoding:  'lf)
+      (lambda (port)
+        (let* ((greys
+                (pgm-greys pgm-data))
+               (pgm-array
+                (pgm-pixels pgm-data))
+               (domain
+                (array-domain pgm-array))
+               (rows
+                (fx- (interval-upper-bound domain 0)
+                     (interval-lower-bound domain 0)))
+               (columns
+                (fx- (interval-upper-bound domain 1)
+                     (interval-lower-bound domain 1))))
+          (if force-ascii
+              (display "P2" port)
+              (display "P5" port))
+          (newline port)
+          (display columns port) (display " " port)
+          (display rows port) (newline port)
+          (display greys port) (newline port)
+          (array-for-each (if force-ascii
+                              (let ((next-pixel-in-line 1))
                                 (lambda (p)
-                                  (write-u8 p port))
-                                (lambda (p)
-                                  (write-u8 (fxand p 255) port)
-                                  (write-u8 (fxarithmetic-shift-right p 8) port))))
-                        pgm-array)))))
+                                  (write p port)
+                                  (if (fxzero? (fxand next-pixel-in-line 15))
+                                      (begin
+                                        (newline port)
+                                        (set! next-pixel-in-line 1))
+                                      (begin
+                                        (display " " port)
+                                        (set! next-pixel-in-line (fx+ 1 next-pixel-in-line))))))
+                              (if (fx< greys 256)
+                                  (lambda (p)
+                                    (write-u8 p port))
+                                  (lambda (p)
+                                    (write-u8 (fxand p 255) port)
+                                    (write-u8 (fxarithmetic-shift-right p 8) port))))
+                          pgm-array)))))))
 
 (define test-pgm (read-pgm "girl.pgm"))
 
