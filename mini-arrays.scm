@@ -692,6 +692,63 @@
 (macro-make-representation->double f16 10 5 15)
 (macro-make-double->representation f16 10 5 15)
 
+#|
+
+;;; The test code for the conversion routines:
+
+(define (test)
+
+  (declare (inlining-limit 0))
+
+  (define (compose-f16 sign exponent mantissa)
+    (bitwise-ior (arithmetic-shift sign 15)
+                 (arithmetic-shift exponent 10)
+                 mantissa))
+
+  (define-macro (check i expr)
+    `(if (not (= ,i ,expr))
+         (begin
+           (pp (list ,i , expr ',expr))
+           (error "crap"))))
+
+  ;; The general strategy is: for the representation of each finite f16 number,
+  ;; 1.  Compute the double (x) associated with that representation, the one before (previous-x)
+  ;;     and the one after (next-x).
+  ;; 2.  Choose a random double strictly between the halfway point between x and each of next-x
+  ;;     and previous-x, and see that it rounds to the f16 representation of x.  (It's strict
+  ;;     for f16, double, and the reference implementation of SRFI 27.)
+  ;; 3.  If the representation is even, check that the double exactly between s and next-x, and
+  ;;     x and previous x rounds to x.  (Round to even rule.)
+  ;; Some care must be taken for the representation of the largest normal f16 number and the representation of 0.
+
+  (do ((i 1 (fx+ i 1)))                  ;; representation of smallest positive number
+      ((fx= i (compose-f16 0 30 1023)))  ;; representation of largest finite number
+    (let* ((x (f16->double i))
+           (next-x (f16->double (+ i 1)))
+           (previous-x (f16->double (- i 1))))
+      (check i (double->f16 (+ x (* 0.5 (random-real) (- next-x x)))))
+      (check i (double->f16 (+ x (* 0.5 (random-real) (- previous-x x)))))
+      (if (even? i)
+          (begin
+            (check i (double->f16 (+ x (* 0.5 (- next-x x)))))
+            (check i (double->f16 (+ x (* 0.5 (- previous-x x)))))))))
+  ;; i = 0
+  (let* ((i 0)
+         (x (f16->double i))
+         (next-x (f16->double (+ i 1)))) ;; no previous-x
+    (check i (double->f16 (+ x (* 0.5 (random-real) (- next-x x)))))
+    (check i (double->f16 (+ x (* 0.5 (- next-x x))))))
+  ;; largest normal
+  (let* ((i (compose-f16 0 30 1023))
+         (x (f16->double i))
+         (previous-x (f16->double (- i 1)))) ;; no next-x
+    (check i (double->f16 (+ x (* 0.5 (random-real) (- previous-x x)))))
+    (check i (double->f16 (+ x (* 0.5 (random-real) (- x previous-x))))) ;; if next-x were finite, this would be the same
+    (check (+ i 1) (double->f16 (+ x (* 0.5 (- x previous-x))))))        ;; check that 1/2 the difference rounds up to +inf.0
+  )
+
+|#
+
 (define f16-storage-class
   (make-storage-class
    ;; getter
