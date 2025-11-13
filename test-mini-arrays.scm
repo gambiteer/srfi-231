@@ -423,6 +423,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                (list-ref lower offset)))
       )))
 
+(next-test-random-source-state!)
+
 (do ((i 0 (+ i 1)))
     ((= i random-tests))
   (let* ((lower (map (lambda (x) (random 10)) (vector->list (make-vector (random 1 11)))))
@@ -550,6 +552,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (list->vector upper2)))
           (and (every (lambda (x) (>= (car x) (cdr x))) (map cons lower1 lower2))
                (every (lambda (x) (<= (car x) (cdr x))) (map cons upper1 upper2))))))
+
+(next-test-random-source-state!)
 
 (pp "interval-empty? tests")
 
@@ -894,8 +898,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                                    "(storage-class-data->body "
                                    (symbol->string name)
                                    "): ")))
-              (test ((storage-class-data->body class) 'a)
-                    message)))
+              (test-error ((storage-class-data->body class) 'a)
+                          message)))
           storage-class-names)
 
 (pp "array error tests")
@@ -6137,7 +6141,7 @@ OTHER DEALINGS IN THE SOFTWARE.
            (list->vector (append (take lowers k) (cons 0 (drop lowers k))))
            (list->vector (append (take uppers k) (cons (length arrays) (drop uppers k))))))
          (getters
-          (list->vector (map %%array-getter arrays))))
+          (list->vector (map array-getter arrays))))
     (make-array new-domain
                 (lambda args
                   (apply

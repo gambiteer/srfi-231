@@ -71,17 +71,19 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 
 (define-type %%array
-  id: 18fd25d7-2204-4920-a5bb-2474fb4de8e4
+  id: db6d2b47-bd45-4638-a0e1-8f95a16ab792
   copier: #f
   ;; Part of all arrays
   ;; an interval
   no-functional-setter:
   (domain read-only:)
   ;; (lambda (i_0 ... i_n-1) ...) returns a value for (i_0,...,i_n-1) in (array-domain a)
-  (getter read-only:)
+  ;; We fill this entry on an "as-needed" basis
+  (getter read-write:)
   (unsafe-getter read-only:)
   ;; Part of mutable arrays
   ;; (lambda (v i_0 ... i_n-1) ...) sets a value for (i_0,...,i_n-1) in (array-domain a)
+  ;; We fill this entry on an "as-needed" basis
   (setter read-write:)
   (unsafe-setter read-write:)
   ;; Part of specialized arrays
@@ -1150,21 +1152,17 @@ OTHER DEALINGS IN THE SOFTWARE.
 (declare (not inline))
 
 (define (%%make-safer-array domain unsafe-getter #!optional (unsafe-setter #f) (checker #f))
-  (let ((getter
-         (%%wrap-getter-in-index-checks domain unsafe-getter))
-        (setter
-         (and unsafe-setter
-              (%%wrap-setter-in-index-and-value-checks domain unsafe-setter checker))))
-    (make-%%array domain
-                  getter
-                  unsafe-getter
-                  setter
-                  unsafe-setter
-                  #f              ; storage-class
-                  #f              ; body
-                  #f              ; indexer
-                  %%order-unknown ; in-order?
-                  )))
+  ;; This is no longer "safer", we wrap accessors in %%%array-getter and %%%array-setter
+  (make-%%array domain
+                #f              ;; getter
+                unsafe-getter
+                #f              ;;setter
+                unsafe-setter
+                #f              ;; storage-class
+                #f              ;; body
+                #f              ;; indexer
+                %%order-unknown ;; in-order?
+                ))
 
 (declare (inline))
 
@@ -1199,10 +1197,20 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%array-domain obj))))
 
 (define (array-getter obj)
-  (cond ((not (array? obj))
-         (error "array-getter: The argument is not an array: " obj))
-        (else
-         (%%array-getter obj))))
+  (or (%%%array-getter obj)
+      (error "array-getter: The argument is not an array: " obj)))
+
+(define (%%%array-getter A)
+  ;; returns a function or #f
+  (and (array? A)
+       (or (%%array-getter A)
+           (begin
+             (%%array-getter-set!
+              A
+              (%%wrap-getter-in-index-checks
+               (%%array-domain A)
+               (%%array-unsafe-getter A)))
+             (%%array-getter A)))))
 
 (define (%%array-dimension array)
   (%%interval-dimension (%%array-domain array)))
@@ -1238,13 +1246,26 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (define (mutable-array? obj)
   (and (array? obj)
-       (not (eq? (%%array-setter obj) #f))))
+       (not (eq? (%%array-unsafe-setter obj) #f))))
 
 (define (array-setter obj)
-  (cond ((not (mutable-array? obj))
-         (error "array-setter: The argument is not an mutable array: " obj))
-        (else
-         (%%array-setter obj))))
+  (or (%%%array-setter obj)
+      (error "array-setter: The argument is not an mutable array: " obj)))
+
+(define (%%%array-setter A)
+  ;; returns a function or #f
+  (and (array? A)
+       (or (%%array-setter A)
+           (and (%%array-unsafe-setter A)
+                (begin
+                  (%%array-setter-set!
+                   A
+                   (%%wrap-setter-in-index-and-value-checks
+                    (%%array-domain A)
+                    (%%array-unsafe-setter A)
+                    (let ((storage-class (%%array-storage-class A)))
+                      (and storage-class (storage-class-checker storage-class)))))
+                  (%%array-setter A))))))
 
 (define (%%array-freeze! A)
   (%%array-setter-set! A #f)
@@ -2411,8 +2432,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                    ;; There's not much point in expanding the storage-class-getter considering the
                    ;; overhead of variable-argument function call, apply, etc.
                    (lambda multi-index (storage-class-getter body (apply indexer multi-index)))))))
-           (getter
-            (%%wrap-getter-in-index-checks domain unsafe-getter))
            (unsafe-setter
             (and mutable?
                  (if (%%interval-empty? domain)
@@ -2425,15 +2444,11 @@ OTHER DEALINGS IN THE SOFTWARE.
                        ((4)  (expand-setters (lambda (value i j k l) (storage-class-setter body (indexer i j k l) value))))
                        ;; There's not much point in expanding the storage-class-setter considering the
                        ;; overhead of variable-argument function call, apply, etc.
-                       (else (lambda (value . multi-index) (storage-class-setter body (apply indexer multi-index) value)))))))
-
-           (setter
-            (and mutable?
-                 (%%wrap-setter-in-index-and-value-checks domain unsafe-setter checker))))
+                       (else (lambda (value . multi-index) (storage-class-setter body (apply indexer multi-index) value))))))))
       (make-%%array domain
-                    getter
+                    #f              ;; getter
                     unsafe-getter
-                    setter
+                    #f              ;; setter
                     unsafe-setter
                     storage-class
                     body
@@ -3858,7 +3873,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (array? array))
          (error "array-insert-axis: The first argument is not an array: " array k))
         ((not (and (exact-integer? k)
-                   (<= 0 k (array-dimension array))))
+                   (<= 0 k (%%array-dimension array))))
          (error "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): "
                 array k))
         (else
@@ -5075,56 +5090,68 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define array-ref
   (case-lambda
    ((A)
-    (if (not (array? A))
-        (error "array-ref: The argument is not an array: " A)
-        ((%%array-getter A))))
+    (cond ((%%%array-getter A)
+           => (lambda (G) (G)))
+          (else
+           (error "array-ref: The argument is not an array: " A))))
    ((A i0)
-    (if (not (array? A))
-        (error "array-ref: The first argument is not an array: " A i0)
-        ((%%array-getter A) i0)))
+    (cond ((%%%array-getter A)
+           => (lambda (G) (G i0)))
+          (else
+           (error "array-ref: The first argument is not an array: " A i0))))
    ((A i0 i1)
-    (if (not (array? A))
-        (error "array-ref: The first argument is not an array: " A i0 i1)
-        ((%%array-getter A) i0 i1)))
+    (cond ((%%%array-getter A)
+           => (lambda (G) (G i0 i1)))
+          (else
+           (error "array-ref: The first argument is not an array: " A i0 i1))))
    ((A i0 i1 i2)
-    (if (not (array? A))
-        (error "array-ref: The first argument is not an array: " A i0 i1 i2)
-        ((%%array-getter A) i0 i1 i2)))
+    (cond ((%%%array-getter A)
+           => (lambda (G) (G i0 i1 i2)))
+          (else
+           (error "array-ref: The first argument is not an array: " A i0 i1 i2))))
    ((A i0 i1 i2 i3)
-    (if (not (array? A))
-        (error "array-ref: The first argument is not an array: " A i0 i1 i2 i3)
-        ((%%array-getter A) i0 i1 i2 i3)))
+    (cond ((%%%array-getter A)
+           => (lambda (G) (G i0 i1 i2 i3)))
+          (else
+           (error "array-ref: The first argument is not an array: " A i0 i1 i2 i3))))
    ((A i0 i1 i2 i3 . i-tail)
-    (if (not (array? A))
-        (apply error "array-ref: The first argument is not an array: " A i0 i1 i2 i3 i-tail)
-        (apply (%%array-getter A) i0 i1 i2 i3 i-tail)))))
+    (cond ((%%%array-getter A)
+           => (lambda (G) (apply G i0 i1 i2 i3 i-tail)))
+          (else
+           (apply error "array-ref: The first argument is not an array: " A i0 i1 i2 i3 i-tail))))))
 
 (define array-set!
   (case-lambda
    ((A v)
-    (if (not (mutable-array? A))
-        (error "array-set!: The first argument is not a mutable array: " A v)
-        ((%%array-setter A) v)))
+    (cond ((%%%array-setter A)
+           => (lambda (S) (S v)))
+          (else
+           (error "array-set!: The first argument is not a mutable array: " A v))))
    ((A v i0)
-    (if (not (mutable-array? A))
-        (error "array-set!: The first argument is not a mutable array: " A v i0)
-        ((%%array-setter A) v i0)))
+    (cond ((%%%array-setter A)
+           => (lambda (S) (S v i0)))
+          (else
+           (error "array-set!: The first argument is not a mutable array: " A v i0))))
    ((A v i0 i1)
-    (if (not (mutable-array? A))
-        (error "array-set!: The first argument is not a mutable array: " A v i0 i1)
-        ((%%array-setter A) v i0 i1)))
+    (cond ((%%%array-setter A)
+           => (lambda (S) (S v i0 i1)))
+          (else
+           (error "array-set!: The first argument is not a mutable array: " A v i0 i1))))
    ((A v i0 i1 i2)
-    (if (not (mutable-array? A))
-        (error "array-set!: The first argument is not a mutable array: " A v i0 i1 i2)
-        ((%%array-setter A) v i0 i1 i2)))
+    (cond ((%%%array-setter A)
+           => (lambda (S) (S v i0 i1 i2)))
+          (else
+           (error "array-set!: The first argument is not a mutable array: " A v i0 i1 i2))))
    ((A v i0 i1 i2 i3)
-    (if (not (mutable-array? A))
-        (error "array-set!: The first argument is not a mutable array: " A v i0 i1 i2 i3)
-        ((%%array-setter A) v i0 i1 i2 i3)))
+    (cond ((%%%array-setter A)
+           => (lambda (S) (S v i0 i1 i2 i3)))
+          (else
+           (error "array-set!: The first argument is not a mutable array: " A v i0 i1 i2 i3))))
    ((A v i0 i1 i2 i3 . i-tail)
-    (if (not (mutable-array? A))
-        (apply error "array-set!: The first argument is not a mutable array: " A v i0 i1 i2 i3 i-tail)
-        (apply (%%array-setter A) v i0 i1 i2 i3 i-tail)))))
+    (cond ((%%%array-setter A)
+           => (lambda (S) (apply S v i0 i1 i2 i3 i-tail)))
+          (else
+           (apply error "array-set!: The first argument is not a mutable array: " A v i0 i1 i2 i3 i-tail))))))
 
 #|
 

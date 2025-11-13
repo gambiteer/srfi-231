@@ -6140,7 +6140,7 @@ that computes the componentwise products when we need them, the times are
            (list->vector (append (take lowers k) (cons 0 (drop lowers k))))
            (list->vector (append (take uppers k) (cons (length arrays) (drop uppers k))))))
          (getters
-          (list->vector (map %%array-getter arrays))))
+          (list->vector (map array-getter arrays))))
     (make-array new-domain
                 (lambda args
                   (apply
