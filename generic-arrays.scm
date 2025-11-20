@@ -834,6 +834,19 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%interval-for-each f interval))))
 
+(define (%%get-next-args reversed-args
+                         reversed-lowers
+                         reversed-uppers)
+  (and (pair? reversed-args)
+       (let ((next-index (+ (car reversed-args) 1)))
+         (if (< next-index (car reversed-uppers))
+             (cons next-index (cdr reversed-args))
+             (let ((tail-result (%%get-next-args (cdr reversed-args)
+                                                 (cdr reversed-lowers)
+                                                 (cdr reversed-uppers))))
+               (and tail-result
+                    (cons (car reversed-lowers) tail-result)))))))
+
 (define (%%interval-for-each f interval)
 
   (define-macro (generate-code)
@@ -889,33 +902,18 @@ OTHER DEALINGS IN THE SOFTWARE.
               ((0) (f))
               ,@(map do-one-case (iota 4 1))
               (else
-               (let ()
-
-                 (define (get-next-args reversed-args
-                                        reversed-lowers
-                                        reversed-uppers)
-                   (let ((next-index (+ (car reversed-args) 1)))
-                     (if (< next-index (car reversed-uppers))
-                         (cons next-index (cdr reversed-args))
-                         (and (not (null? (cdr reversed-args)))
-                              (let ((tail-result (get-next-args (cdr reversed-args)
-                                                                (cdr reversed-lowers)
-                                                                (cdr reversed-uppers))))
-                                (and tail-result
-                                     (cons (car reversed-lowers) tail-result)))))))
-
-                 (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                       (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
-                   (let loop ((reversed-args reversed-lowers))
-                     ;; There's at least one element of the interval, so we can
-                     ;; use a do-until loop
-                     (let ((ignore (apply f (reverse reversed-args)))
-                           (next-reversed-args (get-next-args reversed-args
+               (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
+                     (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
+                 (let loop ((reversed-args reversed-lowers))
+                   ;; There's at least one element of the interval, so we can
+                   ;; use a do-until loop
+                   (let ((ignore (apply f (reverse reversed-args)))
+                         (next-reversed-args (%%get-next-args reversed-args
                                                               reversed-lowers
                                                               reversed-uppers)))
-                       (if next-reversed-args
-                           (loop next-reversed-args)
-                           (void))))))))))
+                     (if next-reversed-args
+                         (loop next-reversed-args)
+                         (void)))))))))
       #;(pp result)
       result))
 
@@ -992,34 +990,19 @@ OTHER DEALINGS IN THE SOFTWARE.
        ((0) (operator identity (f)))
        ,@(map do-one-case (iota 4 1))
        (else
-        (let ()
-
-          (define (get-next-args reversed-args
-                                 reversed-lowers
-                                 reversed-uppers)
-            (let ((next-index (+ (car reversed-args) 1)))
-              (if (< next-index (car reversed-uppers))
-                  (cons next-index (cdr reversed-args))
-                  (and (not (null? (cdr reversed-args)))
-                       (let ((tail-result (get-next-args (cdr reversed-args)
-                                                         (cdr reversed-lowers)
-                                                         (cdr reversed-uppers))))
-                         (and tail-result
-                              (cons (car reversed-lowers) tail-result)))))))
-
-          (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
-            (let loop ((reversed-args reversed-lowers)
-                       (result identity))
-              ;; There's at least one element of the interval, so we can
-              ;; use a do-until loop
-              (let ((result (operator result (apply f (reverse reversed-args))))
-                    (next-reversed-args (get-next-args reversed-args
+        (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
+              (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
+          (let loop ((reversed-args reversed-lowers)
+                     (result identity))
+            ;; There's at least one element of the interval, so we can
+            ;; use a do-until loop
+            (let ((result (operator result (apply f (reverse reversed-args))))
+                  (next-reversed-args (%%get-next-args reversed-args
                                                        reversed-lowers
                                                        reversed-uppers)))
-                (if next-reversed-args
-                    (loop next-reversed-args result)
-                    result))))))))
+              (if next-reversed-args
+                  (loop next-reversed-args result)
+                  result)))))))
 
   (if (%%interval-empty? interval) ;; handle (make-interval '#(10000000 10000000 0)) efficiently
       identity
@@ -1093,31 +1076,16 @@ OTHER DEALINGS IN THE SOFTWARE.
               ((0) (operator (f) identity))
               ,@(map do-one-case (iota 4 1))
               (else
-               (let ()
-
-                 (define (get-next-args reversed-args
-                                        reversed-lowers
-                                        reversed-uppers)
-                   (let ((next-index (+ (car reversed-args) 1)))
-                     (if (< next-index (car reversed-uppers))
-                         (cons next-index (cdr reversed-args))
-                         (and (not (null? (cdr reversed-args)))
-                              (let ((tail-result (get-next-args (cdr reversed-args)
-                                                                (cdr reversed-lowers)
-                                                                (cdr reversed-uppers))))
-                                (and tail-result
-                                     (cons (car reversed-lowers) tail-result)))))))
-
-                 (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                       (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
-                   (let loop ((reversed-args reversed-lowers))
-                     (if reversed-args
-                         (let* ((item (apply f (reverse reversed-args)))
-                                (result (loop (get-next-args reversed-args
+               (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
+                     (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
+                 (let loop ((reversed-args reversed-lowers))
+                   (if reversed-args
+                       (let* ((item (apply f (reverse reversed-args)))
+                              (result (loop (%%get-next-args reversed-args
                                                              reversed-lowers
                                                              reversed-uppers))))
-                           (operator item result))
-                         identity))))))))
+                         (operator item result))
+                       identity)))))))
       result))
 
   (if (%%interval-empty? interval) ;; handle (make-interval '#(10000000 10000000 0)) efficiently
@@ -4326,32 +4294,17 @@ OTHER DEALINGS IN THE SOFTWARE.
              ((0) (f))
              ,@(map do-one-case (iota 4 1))
              (else
-              (let ()
-
-                (define (get-next-args reversed-args
-                                       reversed-lowers
-                                       reversed-uppers)
-                  (let ((next-index (+ (car reversed-args) 1)))
-                    (if (< next-index (car reversed-uppers))
-                        (cons next-index (cdr reversed-args))
-                        (and (not (null? (cdr reversed-args)))
-                             (let ((tail-result (get-next-args (cdr reversed-args)
-                                                               (cdr reversed-lowers)
-                                                               (cdr reversed-uppers))))
-                               (and tail-result
-                                    (cons (car reversed-lowers) tail-result)))))))
-
-                (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                      (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
-                  (let loop ((reversed-args reversed-lowers)
-                             (index (- (%%interval-volume interval) 1)))
-                    (if (eqv? index 0)
-                        (apply f (reverse reversed-args))
-                        (,connector (apply f (reverse reversed-args))
-                                    (loop (get-next-args reversed-args
+              (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
+                    (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
+                (let loop ((reversed-args reversed-lowers)
+                           (index (- (%%interval-volume interval) 1)))
+                  (if (eqv? index 0)
+                      (apply f (reverse reversed-args))
+                      (,connector (apply f (reverse reversed-args))
+                                  (loop (%%get-next-args reversed-args
                                                          reversed-lowers
                                                          reversed-uppers)
-                                          (- index 1))))))))))))
+                                        (- index 1)))))))))))
 
   (let ((result
          `(begin
