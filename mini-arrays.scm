@@ -247,7 +247,7 @@
                                intervals))))
                 indices)
          (make-interval lower-bounds max-upper-bounds))))
-  
+
 (define (interval-contains-multi-index? interval . multi-index)
   (let ((vec-multi-index (list->vector multi-index)))
     (and (vector-every <= (%%interval-lower-bounds interval) vec-multi-index)
@@ -899,7 +899,7 @@
                   storage-class
                   body
                   indexer)))
-    
+
 (define (%%make-specialized-array interval storage-class initial-value)
   (let* ((body
           ((storage-class-maker storage-class)
@@ -1028,7 +1028,7 @@
    ((dimension nested-list storage-class)
     (list*->array dimension nested-list storage-class (specialized-array-default-mutable?)))
    ((dimension nested-list storage-class mutable?)
-    
+
     (define (shape-error)
       (error "list*->array: The second argument is not the right shape to be converted to an array of the given dimension: "
              dimension nested-list))
@@ -1084,7 +1084,7 @@
     (list*->array 0 object storage-class mutable?))))
 
 (define (array->list* array)
-  
+
   (define (a->l a)
     (let ((dim (interval-dimension (array-domain a))))
       (case dim
@@ -1093,7 +1093,7 @@
         (else
          (array->list
           (array-map a->l (array-curry a (fx- dim 1))))))))
-  
+
   (a->l array))
 
 (define vector*->array
@@ -1109,11 +1109,11 @@
                     storage-class
                     (specialized-array-default-mutable?)))
    ((dimension nested-vector storage-class mutable?)
-    
+
     (define (shape-error)
       (error "vector*->array: The second argument is not the right shape to be converted to an array of the given dimension: "
              dimension nested-vector))
-    
+
     (define (flatten-nested-vector dimension nested-vector)
       (case dimension
         ((0) (vector nested-vector))
@@ -1121,7 +1121,7 @@
         (else (vector-concatenate (map (lambda (v)
                                          (flatten-nested-vector (fx- dimension 1) v))
                                        (vector->list nested-vector))))))
-    
+
     (define (check-nested-vector dimension nested-vector)
       (if (eqv? dimension 0)
           '()
@@ -1143,7 +1143,7 @@
                                                (equal? first l))
                                              sublists)
                                (cons len first)))))))))
-    
+
     (let ((vector*-dimensions
            (check-nested-vector dimension nested-vector)))
       (if (not vector*-dimensions)
@@ -1158,7 +1158,7 @@
                          mutable?))))))
 
 (define (array->vector* array)
-  
+
   (define (a->v a)
     (let ((dim (interval-dimension (array-domain a))))
       (case dim
@@ -1167,7 +1167,7 @@
         (else
          (array->vector
           (array-map a->v (array-curry a (fx- dim 1))))))))
-  
+
   (a->v array))
 
 (define (array-assign! destination source)
@@ -1349,7 +1349,7 @@
                             (make-interval (vector-map (lambda (slice-offsets i) (vector-ref slice-offsets i)) offsets i)
                                            (vector-map (lambda (slice-offsets i) (vector-ref slice-offsets (fx+ i 1))) offsets i))))
                       (array-extract A subdomain)))))))
-    
+
 
 (define (array-translate array translation)
 
@@ -1357,12 +1357,12 @@
     (let ((translation-list (vector->list translation)))
       (lambda multi-index
         (apply getter (map - multi-index translation-list)))))
-  
+
   (define (setter-translate setter translation)
     (let ((translation-list (vector->list translation)))
       (lambda (v . multi-index)
         (apply setter v (map - multi-index translation-list)))))
-  
+
   (cond ((specialized-array? array)
          (specialized-array-share array
                                   (interval-translate (array-domain array) translation)
@@ -1390,7 +1390,7 @@
     (let ((permutation-inverse (%%permutation-invert permutation)))
       (lambda indices
         (apply getter (%%vector-permute->list (list->vector indices) permutation-inverse)))))
-  
+
   (define (setter-permute setter permutation)
     (let ((permutation-inverse (%%permutation-invert permutation)))
       (lambda (v . indices)
@@ -1413,7 +1413,7 @@
    ((array)
     (array-reverse array (make-vector (array-dimension array) #t)))
    ((array flip?)
-    
+
     (define (getter-reverse getter flip? interval)
       (let* ((flip?
               (vector->list flip?))
@@ -1428,7 +1428,7 @@
                                    (- adjustment i)
                                    i))
                              indices adjustment flip?)))))
-    
+
     (define (setter-reverse setter flip? interval)
       (let* ((flip?
               (vector->list flip?))
@@ -1443,7 +1443,7 @@
                                      (- adjustment i)
                                      i))
                                indices adjustment flip?)))))
-    
+
     (cond ((specialized-array? array)
            (specialized-array-share array
                                     (array-domain array)

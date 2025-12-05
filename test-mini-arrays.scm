@@ -51,7 +51,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                   "Wrong number of arguments passed to procedure ")
                                  (else
                                   "piffle")))
-                         
+
                          (lambda ()
                            ,expr))))))
        (set! total-tests (+ total-tests 1))
@@ -1226,7 +1226,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (do ((i 0 (fx+ i 1)))
     ((fx= i random-tests))
-  
+
   (let* ((storage-class-and-initializer
           (random-storage-class-and-initializer))
          (storage-class
@@ -1239,7 +1239,7 @@ OTHER DEALINGS IN THE SOFTWARE.
            (random-boolean))
          (mutable?
           (random-boolean)))
-    
+
     (parameterize ((specialized-array-default-mutable? default-mutable?))
 
       (let ((result
@@ -1247,7 +1247,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         (test (array-ref result)           object)
         (test (array-storage-class result) generic-storage-class)
         (test (mutable-array? result)      default-mutable?))
-      
+
       (let ((result
              (object->array object storage-class)))
         (test (array-ref result)           object)
@@ -2106,7 +2106,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                   list)
                                       u16-storage-class)
                           (wrap "Not all elements of the source can be stored in destination: "))
-              
+
               (test-error (array-copy (make-array (make-interval '#(1 1 1 1) '#(2 2 2 2))
                                                   list)
                                       u16-storage-class)
@@ -3177,7 +3177,7 @@ OTHER DEALINGS IN THE SOFTWARE.
        (immutable-array (make-array (array-domain mutable-array)
                                     (array-getter mutable-array)))
        (new-lower-bounds '#(10 -2)))
-  
+
   (test-error (array-rebase 'a)
               "array-rebase: The argument is not an array: ")
   (test-error (array-rebase 'a 1)
@@ -3186,7 +3186,7 @@ OTHER DEALINGS IN THE SOFTWARE.
               "array-rebase: The second argument is not a vector of exact integers: ")
   (test-error (array-rebase immutable-array '#(0 2 3))
               "array-rebase: The length of the second argument is not the dimension of the first: ")
-  
+
   (let ((specialized-result (array-rebase specialized-array)))
     (test (specialized-array? specialized-result)
           #t))
@@ -3217,7 +3217,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                (array? immutable-result)
                (not (mutable-array? immutable-result)))
           #t))
-  
+
   (do ((i 0 (+ i 1)))
       ((= i random-tests))
     (let* ((domain (random-interval))
@@ -3693,7 +3693,7 @@ OTHER DEALINGS IN THE SOFTWARE.
             (make-array domain
                         (array-getter copy)
                         (array-setter copy))))
-         
+
          (immutable
           (let ((copy (array-copy specialized)))
             (make-array domain
