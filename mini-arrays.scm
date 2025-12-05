@@ -261,7 +261,7 @@
   ;; returns the next reversed multi-index in the interval
   ;; with the given reversed lowers and reversed uppers
   ;; or #f if there is no following multi-index.
-  (and (not (null? reversed-args))
+  (and (pair? reversed-args)
        (let ((next-index (+ (car reversed-args) 1)))
          (if (< next-index (car reversed-uppers))
              (cons next-index (cdr reversed-args))
