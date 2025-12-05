@@ -724,50 +724,51 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%interval-insert-axis interval k u_k))))
 
 (define (%%compute-broadcast-interval intervals)
-  (if (every (lambda (I) (%%interval= (car intervals) I)) (cdr intervals)) ;; a common case
-      (car intervals)
-      (let* ((max-dim
-              (apply fxmax (map %%interval-dimension intervals)))
-             (indices
-              (iota max-dim))
-             (intervals   ;; add axes to the left with lower bound 0 and upper bound 1
-              (map (lambda (interval)
-                     (%%interval-cartesian-product
-                      (list (make-interval (make-vector (fx- max-dim (%%interval-dimension interval)) 1))
-                            interval)))
-                   intervals))
-             (lower-bounds
-              (%%interval-lower-bounds (car intervals)))
-             (max-upper-bounds
-              (list->vector
-               (map (lambda (k)
-                      (apply max (map (lambda (interval)
-                                        (%%interval-upper-bound interval k))
-                                      intervals)))
-                    indices))))
-        (and (every (lambda (interval)
-                      (equal? (%%interval-lower-bounds interval) lower-bounds))
-                    (cdr intervals))
-             (every (lambda (k)
-                      (let ((max-upper-bound (vector-ref max-upper-bounds k))
-                            (lower-bound (vector-ref lower-bounds k)))
-                        (if (eqv? lower-bound 0)
-                            (every (lambda (interval)
-                                     (let ((upper-bound (%%interval-upper-bound interval k)))
-                                       (or (eqv? upper-bound 1)
-                                           (eqv? upper-bound max-upper-bound))))
-                                   intervals)
-                            (every (lambda (interval)
-                                     (eqv? (%%interval-upper-bound interval k)
-                                           (vector-ref max-upper-bounds k)))
-                                   intervals))))
-                    indices)
-             (make-interval lower-bounds max-upper-bounds)))))
+  (let* ((max-dim
+          (apply fxmax (map %%interval-dimension intervals)))
+         (indices
+          (iota max-dim))
+         (intervals   ;; add axes to the left with lower bound 0 and upper bound 1
+          (map (lambda (interval)
+                 (%%interval-cartesian-product
+                  (list (make-interval (make-vector (fx- max-dim (%%interval-dimension interval)) 1))
+                        interval)))
+               intervals))
+         (lower-bounds
+          (%%interval-lower-bounds (car intervals)))
+         (max-upper-bounds
+          (list->vector
+           (map (lambda (k)
+                  (apply max (map (lambda (interval)
+                                    (%%interval-upper-bound interval k))
+                                  intervals)))
+                indices))))
+    (and (every (lambda (interval)
+                  (equal? (%%interval-lower-bounds interval) lower-bounds))
+                (cdr intervals))
+         (every (lambda (k)
+                  (let ((max-upper-bound (vector-ref max-upper-bounds k))
+                        (lower-bound (vector-ref lower-bounds k)))
+                    (if (eqv? lower-bound 0)
+                        (every (lambda (interval)
+                                 (let ((upper-bound (%%interval-upper-bound interval k)))
+                                   (or (eqv? upper-bound 1)
+                                       (eqv? upper-bound max-upper-bound))))
+                               intervals)
+                        (every (lambda (interval)
+                                 (eqv? (%%interval-upper-bound interval k)
+                                       (vector-ref max-upper-bounds k)))
+                               intervals))))
+                indices)
+         (make-interval lower-bounds max-upper-bounds))))
 
-(define (compute-broadcast-interval interval . intervals)
-  (if (every interval? (cons interval intervals))
-      (%%compute-broadcast-interval (cons interval intervals))
-      (error "compute-broadcast-interval: The arguments are not all intervals: " intervals)))
+(define (compute-broadcast-interval intervals)
+  (cond ((not (and (list? intervals)
+                   (not (null? intervals))
+                   (every interval? intervals)))
+         (error "compute-broadcast-interval: The argument is not a nonempty list of intervals: " intervals))
+        (else
+         (%%compute-broadcast-interval intervals))))
 
 (declare (inline))
 
@@ -3837,8 +3838,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (array-insert-axis array k #!optional (u_k 1))
   (cond ((not (and (exact-integer? u_k) (positive? u_k)))
          (error "array-insert-axis: The third argument is not a positive exact integer: " array k u_k))
-        ((and (< 1 u_k) (not (specialized-array? array)))
-         (error "array-insert-axis: The first argument is not a specialized array and the third argument is > 1: " array k u_k))
         ((not (array? array))
          (error "array-insert-axis: The first argument is not an array: " array k))
         ((not (and (exact-integer? k)
@@ -4131,13 +4130,14 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%array-curry array right-dimension))))
 
 ;;;
-;;; array-map returns a *generalized* array whose domain is the same as the common domain
-;;; of (cons array arrays) and whose unsafe-getter is
+;;; array-map returns an array whose domain is the same as the common domain of (cons array arrays)
+;;; and whose unsafe-getter is
 ;;;
 ;;; (lambda multi-index
 ;;;   (apply f (map (lambda (g) (apply g multi-index)) (map array-unsafe-getter (cons array arrays)))))
 ;;;
-;;; We try to specialize this function to speed things up a bit.
+;;; This function is also used in array-for-each, so we try to specialize the this
+;;; function to speed things up a bit.
 ;;;
 
 (define (%%specialize-function-applied-to-array-getters f array arrays)
@@ -4219,10 +4219,19 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; applies f to the elements of the arrays in lexicographical order.
 
-(define (array-for-each array)
-  (if (array? array)
-      (%%interval-for-each (%%array-unsafe-getter array) (%%array-domain array))
-      (error "array-for-each: The argument is not an array: " array)))
+(define (%%array-for-each f array arrays)
+  (%%interval-for-each (%%specialize-function-applied-to-array-getters f array arrays)
+                       (%%array-domain array)))
+
+(define (array-for-each f array #!rest arrays)
+  (cond ((not (procedure? f))
+         (apply error "array-for-each: The first argument is not a procedure: " f array arrays))
+        ((not (every array? (cons array arrays)))
+         (apply error "array-for-each: Not all arguments after the first are arrays: " f array arrays))
+        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
+         (apply error "array-for-each: Not all arrays have the same domain: " f array arrays))
+        (else
+         (%%array-for-each f array arrays))))
 
 (define-macro (macro-make-predicates)
 
@@ -4314,15 +4323,33 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (macro-make-predicates)
 
-(define (array-every array)
-  (if (array? array)
-      (%%interval-every (%%array-unsafe-getter array) (%%array-domain array))
-      (error "array-every: The argument is not an array: " array)))
+(define (%%array-every f array arrays)
+  (%%interval-every (%%specialize-function-applied-to-array-getters f array arrays)
+                    (%%array-domain array)))
 
-(define (array-any array)
-  (if (array? array)
-      (%%interval-any (%%array-unsafe-getter array) (%%array-domain array))
-      (error "array-any: The argument is not an array: " array)))
+(define (array-every f array #!rest arrays)
+  (cond ((not (procedure? f))
+         (apply error "array-every: The first argument is not a procedure: " f array arrays))
+        ((not (every array? (cons array arrays)))
+         (apply error "array-every: Not all arguments after the first are arrays: " f array arrays))
+        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
+         (apply error "array-every: Not all arrays have the same domain: " f array arrays))
+        (else
+         (%%array-every f array arrays))))
+
+(define (%%array-any f array arrays)
+  (%%interval-any (%%specialize-function-applied-to-array-getters f array arrays)
+                  (%%array-domain array)))
+
+(define (array-any f array #!rest arrays)
+  (cond ((not (procedure? f))
+         (apply error "array-any: The first argument is not a procedure: " f array arrays))
+        ((not (every array? (cons array arrays)))
+         (apply error "array-any: Not all arguments after the first are arrays: " f array arrays))
+        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
+         (apply error "array-any: Not all arrays have the same domain: " f array arrays))
+        (else
+         (%%array-any f array arrays))))
 
 (define (array-fold-left op id array . arrays)
   (cond ((not (procedure? op))
@@ -4672,15 +4699,15 @@ OTHER DEALINGS IN THE SOFTWARE.
           (%%array-curry (%%array-permute result-array (%%index-first (%%interval-dimension result-domain) k))
                          (%%interval-dimension domain))))
     ;; copy each array argument to the associated place in stack
-    (array-for-each (%%array-map (lambda (destination source)
-                                   (%%move-array-elements destination source caller))
-                                 permuted-and-curried-result
-                                 (list (%%list->array (make-interval (vector number-of-arrays))
-                                                      arrays
-                                                      generic-storage-class
-                                                      #f
-                                                      caller
-                                                      #t))))  ;; fresh-l?
+    (%%array-for-each (lambda (destination source)
+                        (%%move-array-elements destination source caller))
+                      permuted-and-curried-result
+                      (list (%%list->array (make-interval (vector number-of-arrays))
+                                           arrays
+                                           generic-storage-class
+                                           #f
+                                           caller
+                                           #t)))  ;; fresh-l?
     (if (not mutable?)
         (%%array-freeze! result-array)
         result-array)))
@@ -4858,14 +4885,14 @@ OTHER DEALINGS IN THE SOFTWARE.
          (let* ((A   (array-copy A-arg))
                 (A_  (%%array-unsafe-getter A))
                 (A_D (%%array-domain A)))
-           (if (not (array-every (%%array-map array? A '())))
+           (if (not (%%array-every array? A '()))
                (error (string-append caller "Not all elements of the first argument (an array) are arrays: ") A-arg)
                (let* ((first-element (apply A_ (%%interval-lower-bounds->list A_D)))
                       (first-domain  (%%array-domain first-element)))
-                 (if (not (array-every (%%array-map (lambda (a) (%%interval= (%%array-domain a) first-domain)) A '())))
+                 (if (not (%%array-every  (lambda (a) (%%interval= (%%array-domain a) first-domain)) A '()))
                      (error (string-append caller "Not all elements of the first argument (an array) have the domain: ") A-arg)
                      (let* ((A (if (and call/cc-safe?
-                                        (not (array-every (%%array-map specialized-array? A '()))))
+                                        (not (%%array-every specialized-array? A '())))
                                    (%%->specialized-array (%%array-map (lambda (A)
                                                                          (%%->specialized-array A storage-class caller))
                                                                        A
@@ -4878,11 +4905,11 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                                       storage-class
                                                                       (storage-class-default storage-class)))
                             (curried-result (%%array-curry result (%%interval-dimension first-domain))))
-                       (array-for-each (%%array-map (lambda (result argument)
-                                                      (%%move-array-elements result
-                                                                             argument
-                                                                             caller))
-                                                    curried-result (list A)))
+                       (%%array-for-each (lambda (result argument)
+                                           (%%move-array-elements result
+                                                                  argument
+                                                                  caller))
+                                         curried-result (list A))
                        (if (not mutable?)
                            (%%array-freeze! result)
                            result)))))))))
@@ -4919,25 +4946,24 @@ OTHER DEALINGS IN THE SOFTWARE.
                 (A_D              (%%array-domain A))
                 (A_dim            (%%interval-dimension A_D))
                 (ks               (list->vector (iota A_dim))))
-           (cond ((not (array-every (%%array-map array? A '())))
+           (cond ((not (%%array-every array? A '()))
                   (error (string-append caller "Not all elements of the first argument (an array) are arrays: ") A-arg))
-                 ((not (array-every (%%array-map (lambda (a) (fx= (%%array-dimension a) A_dim)) A '())))
+                 ((not (%%array-every (lambda (a) (fx= (%%array-dimension a) A_dim)) A '()))
                   (error (string-append caller "Not all elements of the first argument (an array) have the same dimension as the first argument itself: ") A-arg))
                  ((not (vector-every
                         (lambda (k)       ;; the direction
                           (let ((slices   ;; the slices in that direction
                                  (%%array-curry (%%array-permute A (%%index-first A_dim k))
                                                 (fx- A_dim 1))))
-                            (array-every
-                             (%%array-map
-                              (lambda (slice)
-                                (let ((kth-width-of-arrays-in-slice
-                                       (map (lambda (a)
-                                              (%%interval-width (%%array-domain a) k))
-                                            (%%array->list slice))))
-                                  (or (null? kth-width-of-arrays-in-slice)
-                                      (every (lambda (w) (= (car kth-width-of-arrays-in-slice) w)) (cdr kth-width-of-arrays-in-slice)))))
-                              slices '()))))
+                            (%%array-every
+                             (lambda (slice)
+                               (let ((kth-width-of-arrays-in-slice
+                                      (map (lambda (a)
+                                             (%%interval-width (%%array-domain a) k))
+                                           (%%array->list slice))))
+                                 (or (null? kth-width-of-arrays-in-slice)
+                                     (every (lambda (w) (= (car kth-width-of-arrays-in-slice) w)) (cdr kth-width-of-arrays-in-slice)))))
+                             slices '())))
                         ks))
                   (error (string-append caller "Cannot stack array elements of the first argument into result array: ") A-arg))
                  (else
@@ -4965,7 +4991,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                            ks))
                          (A
                           (if (and call/cc-safe?
-                                   (not (array-every (%%array-map specialized-array? A '()))))
+                                   (not (%%array-every specialized-array? A '())))
                               (%%->specialized-array (%%array-map (lambda (A)
                                                                     (%%->specialized-array A storage-class caller))
                                                                   A
