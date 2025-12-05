@@ -724,51 +724,50 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%interval-insert-axis interval k u_k))))
 
 (define (%%compute-broadcast-interval intervals)
-  (let* ((max-dim
-          (apply fxmax (map %%interval-dimension intervals)))
-         (indices
-          (iota max-dim))
-         (intervals   ;; add axes to the left with lower bound 0 and upper bound 1
-          (map (lambda (interval)
-                 (%%interval-cartesian-product
-                  (list (make-interval (make-vector (fx- max-dim (%%interval-dimension interval)) 1))
-                        interval)))
-               intervals))
-         (lower-bounds
-          (%%interval-lower-bounds (car intervals)))
-         (max-upper-bounds
-          (list->vector
-           (map (lambda (k)
-                  (apply max (map (lambda (interval)
-                                    (%%interval-upper-bound interval k))
-                                  intervals)))
-                indices))))
-    (and (every (lambda (interval)
-                  (equal? (%%interval-lower-bounds interval) lower-bounds))
-                (cdr intervals))
-         (every (lambda (k)
-                  (let ((max-upper-bound (vector-ref max-upper-bounds k))
-                        (lower-bound (vector-ref lower-bounds k)))
-                    (if (eqv? lower-bound 0)
-                        (every (lambda (interval)
-                                 (let ((upper-bound (%%interval-upper-bound interval k)))
-                                   (or (eqv? upper-bound 1)
-                                       (eqv? upper-bound max-upper-bound))))
-                               intervals)
-                        (every (lambda (interval)
-                                 (eqv? (%%interval-upper-bound interval k)
-                                       (vector-ref max-upper-bounds k)))
-                               intervals))))
-                indices)
-         (make-interval lower-bounds max-upper-bounds))))
+  (if (every (lambda (I) (%%interval= (car intervals) I)) (cdr intervals)) ;; a common case
+      (car intervals)
+      (let* ((max-dim
+              (apply fxmax (map %%interval-dimension intervals)))
+             (indices
+              (iota max-dim))
+             (intervals   ;; add axes to the left with lower bound 0 and upper bound 1
+              (map (lambda (interval)
+                     (%%interval-cartesian-product
+                      (list (make-interval (make-vector (fx- max-dim (%%interval-dimension interval)) 1))
+                            interval)))
+                   intervals))
+             (lower-bounds
+              (%%interval-lower-bounds (car intervals)))
+             (max-upper-bounds
+              (list->vector
+               (map (lambda (k)
+                      (apply max (map (lambda (interval)
+                                        (%%interval-upper-bound interval k))
+                                      intervals)))
+                    indices))))
+        (and (every (lambda (interval)
+                      (equal? (%%interval-lower-bounds interval) lower-bounds))
+                    (cdr intervals))
+             (every (lambda (k)
+                      (let ((max-upper-bound (vector-ref max-upper-bounds k))
+                            (lower-bound (vector-ref lower-bounds k)))
+                        (if (eqv? lower-bound 0)
+                            (every (lambda (interval)
+                                     (let ((upper-bound (%%interval-upper-bound interval k)))
+                                       (or (eqv? upper-bound 1)
+                                           (eqv? upper-bound max-upper-bound))))
+                                   intervals)
+                            (every (lambda (interval)
+                                     (eqv? (%%interval-upper-bound interval k)
+                                           (vector-ref max-upper-bounds k)))
+                                   intervals))))
+                    indices)
+             (make-interval lower-bounds max-upper-bounds)))))
 
-(define (compute-broadcast-interval intervals)
-  (cond ((not (and (list? intervals)
-                   (not (null? intervals))
-                   (every interval? intervals)))
-         (error "compute-broadcast-interval: The argument is not a nonempty list of intervals: " intervals))
-        (else
-         (%%compute-broadcast-interval intervals))))
+(define (compute-broadcast-interval interval . intervals)
+  (if (every interval? (cons interval intervals))
+      (%%compute-broadcast-interval (cons interval intervals))
+      (error "compute-broadcast-interval: The arguments are not all intervals: " intervals)))
 
 (declare (inline))
 

@@ -3743,13 +3743,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (pp "compute-broadcast-interval tests")
 
 (test (compute-broadcast-interval 'a)
-      "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
-
-(test (compute-broadcast-interval '())
-      "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
-
-(test (compute-broadcast-interval '(a))
-      "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+      "compute-broadcast-interval: The arguments are not all intervals: ")
 
 ;;; I don't know yet how to test compute-broadcast-interval
 

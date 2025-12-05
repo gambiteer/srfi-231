@@ -209,8 +209,10 @@
       (make-interval (list->vector (append (take lowers k) (list 0) (drop lowers k)))
                      (list->vector (append (take uppers k) (list u_k) (drop uppers k))))))))
 
-(define (compute-broadcast-intervals intervals)
-  (let* ((max-dim
+(define (compute-broadcast-interval interval . intervals)
+  (let* ((intervals
+          (cons interval intervals))
+         (max-dim
           (apply max (map interval-dimension intervals)))
          (indices
           (iota max-dim))

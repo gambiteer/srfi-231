@@ -72,14 +72,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; comment one of the following two expressions.
 
-
+#;
 (begin
   (include "mini-arrays.scm")
 
   (define-macro (test-error expr value)
     #t))
 
-#;
+
 (begin
   (include "generic-arrays.scm")
 
@@ -3738,15 +3738,21 @@ OTHER DEALINGS IN THE SOFTWARE.
 (pp "compute-broadcast-interval tests")
 
 (test-error (compute-broadcast-interval 'a)
-            "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+            "compute-broadcast-interval: The arguments are not all intervals: ")
 
-(test-error (compute-broadcast-interval '())
-            "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+(test-error (compute-broadcast-interval (make-interval '#()) '())
+            "compute-broadcast-interval: The arguments are not all intervals: ")
 
 (test-error (compute-broadcast-interval '(a))
-            "compute-broadcast-interval: The argument is not a nonempty list of intervals: ")
+            "compute-broadcast-interval: The arguments are not all intervals: ")
 
-;;; I don't know yet how to test compute-broadcast-interval
+(test (compute-broadcast-interval (make-interval '#(1 3)) (make-interval '#(1 4)))
+      #f)
+
+(test (compute-broadcast-interval (make-interval '#(4)) (make-interval '#(-1 0) '#(1 4)))
+      #f)
+
+;;; I still don't know how to test compute-broadcast-interval
 
 (pp "test interval-scale and array-sample")
 
