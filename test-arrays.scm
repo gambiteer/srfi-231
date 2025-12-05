@@ -436,6 +436,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                (list-ref lower offset)))
       )))
 
+(next-test-random-source-state!)
+
 (do ((i 0 (+ i 1)))
     ((= i random-tests))
   (let* ((lower (map (lambda (x) (random 10)) (vector->list (make-vector (random 1 11)))))
@@ -563,6 +565,8 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (list->vector upper2)))
           (and (every (lambda (x) (>= (car x) (cdr x))) (map cons lower1 lower2))
                (every (lambda (x) (<= (car x) (cdr x))) (map cons upper1 upper2))))))
+
+(next-test-random-source-state!)
 
 (pp "interval-empty? tests")
 

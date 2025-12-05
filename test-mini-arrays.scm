@@ -1752,7 +1752,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (%%array-packed? translated-sampled-array)
 (%%compute-array-packed? (%%array-domain translated-sampled-array) (%%array-indexer translated-sampled-array)))))
 
-(next-test-random-source-state!)
+#;(next-test-random-source-state!)
 
 #;
 
@@ -1789,7 +1789,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (array-packed? curried-sampled-array)
 (%%compute-array-packed? (%%array-domain curried-sampled-array) (%%array-indexer curried-sampled-array)))))
 
-(next-test-random-source-state!)
+#;(next-test-random-source-state!)
 
 ;;; FIXME: array-reshape tests.
 
