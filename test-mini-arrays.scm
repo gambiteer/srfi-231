@@ -72,14 +72,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; comment one of the following two expressions.
 
-#;
+
 (begin
   (include "mini-arrays.scm")
 
   (define-macro (test-error expr value)
     #t))
 
-
+#;
 (begin
   (include "generic-arrays.scm")
 
@@ -4858,26 +4858,14 @@ OTHER DEALINGS IN THE SOFTWARE.
   )
 
 (define (palindrome? s)
-  (let* ((n
-          (string-length s))
-         (a
-          ;; an array accessing the characters of s
-          (make-array (make-interval (vector n))
-                      (lambda (i)
-                        (string-ref s i))))
-         (ra
-          ;; the characters accessed in reverse order
-          (array-reverse a))
-         (half-domain
-          (make-interval (vector (quotient n 2)))))
-    ;; If n is 0 or 1 the following extracted arrays
-    ;; are empty.
-    (array-every
-     char=?
-     ;; the first half of s
-     (array-extract a half-domain)
-     ;; the reversed second half of s
-     (array-extract ra half-domain))))
+  (let ((S (make-specialized-array-from-data s char-storage-class))
+        (half-domain (make-interval (vector (quotient (string-length s) 2)))))
+    ;; The two extracted arrays are empty if s consists of 0 or 1 characters
+    (array-every char-ci=?
+                 ;; the first half of S
+                 (array-extract S half-domain)
+                 ;; the reversed second half of S
+                 (array-extract (array-reverse S) half-domain))))
 
 (for-each (lambda (s)
             (for-each display
@@ -4886,7 +4874,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                             "\") => "
                             (palindrome? s)
                             #\newline)))
-          '("" "a" "aa" "ab" "aba" "abc" "abba" "abca" "abbc"))
+          '("" "a" "aa" "ab" "aba" "abc" "abba" "abca" "abbc" "AManAPlanACanalPanama"))
 
 (let ((a (make-array (make-interval '#(10)) (lambda (i) i))))
   (test (array-fold-left cons '() a)
