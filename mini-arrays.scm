@@ -285,33 +285,37 @@
                 (loop next-reversed-args)
                 (void)))))))
 
-(define (interval-fold-left f operator left-identity interval)
+(define (interval-fold-left operator left-identity interval f . fs)
   (if (interval-empty? interval)
       left-identity
-      (let ((reversed-lowers (reverse (interval-lower-bounds->list interval)))
+      (let ((fs (cons f fs))
+            (reversed-lowers (reverse (interval-lower-bounds->list interval)))
             (reversed-uppers (reverse (interval-upper-bounds->list interval))))
         (let loop ((reversed-args reversed-lowers)
                    (result left-identity))
-          (let ((result (operator result (apply f (reverse reversed-args))))
-                (next-reversed-args (%%get-next-args reversed-args
-                                                     reversed-lowers
-                                                     reversed-uppers)))
+          (let* ((args (reverse reversed-args))
+                 (result (apply operator result (map (lambda (f) (apply f args)) fs)))
+                 (next-reversed-args (%%get-next-args reversed-args
+                                                      reversed-lowers
+                                                      reversed-uppers)))
             (if next-reversed-args
                 (loop next-reversed-args result)
                 result))))))
 
-(define (interval-fold-right f operator right-identity interval)
+(define (interval-fold-right operator right-identity interval f . fs)
   (if (interval-empty? interval)
       right-identity
       (let ((reversed-lowers (reverse (interval-lower-bounds->list interval)))
-            (reversed-uppers (reverse (interval-upper-bounds->list interval))))
+            (reversed-uppers (reverse (interval-upper-bounds->list interval)))
+            (fs (cons f fs)))
         (let loop ((reversed-args reversed-lowers))
           (if reversed-args
-              (let* ((item (apply f (reverse reversed-args)))
+              (let* ((args (reverse reversed-args))
+                     (items (map (lambda (f) (apply f args)) fs))
                      (result (loop (%%get-next-args reversed-args
                                                     reversed-lowers
                                                     reversed-uppers))))
-                (operator item result))
+                (apply operator (append items (list result))))
               right-identity)))))
 
 (define specialized-array-default-mutable?
@@ -976,10 +980,10 @@
                          storage-class item)))))))))
 
 (define (%%array->reversed-list array)
-  (interval-fold-left (array-getter array)
-                      (lambda (a b) (cons b a))
+  (interval-fold-left (lambda (a b) (cons b a))
                       '()
-                      (array-domain array)))
+                      (array-domain array)
+                      (array-getter array)))
 
 (define (array->list array)
   (reverse (%%array->reversed-list array)))
@@ -1591,29 +1595,31 @@
                   (array-domain array)))
 
 (define (array-fold-left op left-id array . arrays)
-  (interval-fold-left (array-getter (apply array-map list array arrays))
-                      (lambda (id elements)
-                        (apply op id elements))
-                      left-id
-                      (array-domain array)))
+  (apply interval-fold-left
+         op
+         left-id
+         (array-domain array)
+         (array-getter array)
+         (map array-getter arrays)))
 
 (define (array-fold-right op right-id array . arrays)
-  (interval-fold-right (array-getter (apply array-map list array arrays))
-                       (lambda (elements id)
-                         (apply op (append elements (list id))))
-                       right-id
-                       (array-domain array)))
+  (apply interval-fold-right
+         op
+         right-id
+         (array-domain array)
+         (array-getter array)
+         (map array-getter arrays)))
 
 (define array-reduce
   (let ((%%array-reduce-base (list 'base)))
     (lambda (sum A)
-      (interval-fold-left (array-getter A)
-                          (lambda (id a)
+      (interval-fold-left (lambda (id a)
                             (if (eq? id %%array-reduce-base)
                                 a
                                 (sum id a)))
                           %%array-reduce-base
-                          (array-domain A)))))
+                          (array-domain A)
+                          (array-getter A)))))
 
 (define (array-inner-product A f g B)
   (array-outer-product

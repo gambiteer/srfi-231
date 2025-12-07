@@ -657,29 +657,29 @@ OTHER DEALINGS IN THE SOFTWARE.
 (pp "interval-fold-left and interval-fold-right error tests")
 
 (test (interval-fold-left 1 2 3 4)
-      "interval-fold-left: The fourth argument is not an interval: ")
+      "interval-fold-left: The third argument is not an interval: ")
 
-(test (interval-fold-left 1 2 3 (make-interval '#(2 2)))
-      "interval-fold-left: The second argument is not a procedure: ")
-
-(test (interval-fold-left 1 values 3 (make-interval '#(2 2)))
+(test (interval-fold-left 2 3 (make-interval '#(2 2)) 1)
       "interval-fold-left: The first argument is not a procedure: ")
 
+(test (interval-fold-left values 3 (make-interval '#(2 2)) 2)
+      "interval-fold-left: Not all arguments after the third are procedures: ")
+
 (test (interval-fold-right 1 2 3 4)
-      "interval-fold-right: The fourth argument is not an interval: ")
+      "interval-fold-right: The third argument is not an interval: ")
 
-(test (interval-fold-right 1 2 3 (make-interval '#(2 2)))
-      "interval-fold-right: The second argument is not a procedure: ")
-
-(test (interval-fold-right 1 values 3 (make-interval '#(2 2)))
+(test (interval-fold-right 2 3 (make-interval '#(2 2)) 1)
       "interval-fold-right: The first argument is not a procedure: ")
+
+(test (interval-fold-right values 3 (make-interval '#(2 2)) 1)
+      "interval-fold-right: Not all arguments after the third are procedures: ")
 
 ;;; We'll mainly rely on tests for array-fold[lr] to test interval-fold[lr]
 
-(test (interval-fold-left identity + 0 (make-interval '#(5)))
+(test (interval-fold-left + 0 (make-interval '#(5)) identity)
       10)
 
-(test (interval-fold-right identity + 0 (make-interval '#(5)))
+(test (interval-fold-right + 0 (make-interval '#(5)) identity)
       10)
 
 (pp "interval-dilate error tests")
