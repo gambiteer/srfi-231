@@ -4604,13 +4604,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define %%array-reduce
   (let ((%%array-reduce-base (list 'base)))
     (lambda (sum A)
-      (%%interval-fold-left (lambda (id a)
-                              (if (eq? id %%array-reduce-base)
-                                  a
-                                  (sum id a)))
-                            %%array-reduce-base
-                            (%%array-domain A)
-                            (list (%%array-unsafe-getter A))))))
+      (%%array-fold-left (lambda (id a)
+                           (if (eq? id %%array-reduce-base)
+                               a
+                               (sum id a)))
+                         %%array-reduce-base
+                         (list A)))))
 
 (define (array-reduce sum A)
   (cond ((not (array? A))
