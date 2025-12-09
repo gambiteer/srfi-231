@@ -1072,6 +1072,8 @@ OTHER DEALINGS IN THE SOFTWARE.
       (case (length fs)
         ((1) (generate-one-f-code 1))
         ((2) (generate-one-f-code 2))
+        ((3) (generate-one-f-code 3))
+        ((4) (generate-one-f-code 4))
         (else (generate-all-fs)))))
 
 (define (interval-fold-right operator identity interval f . fs)
@@ -1223,8 +1225,8 @@ OTHER DEALINGS IN THE SOFTWARE.
       (case (length fs)
         ((1) (generate-one-f-code 1))
         ((2) (generate-one-f-code 2))
-        #;((3) (generate-one-f-code 3))
-        #;((4) (generate-one-f-code 4))
+        ((3) (generate-one-f-code 3))
+        ((4) (generate-one-f-code 4))
         (else (generate-all-fs)))))
 
 ;; We'll use the same basic container for all types of arrays.
@@ -4543,28 +4545,26 @@ OTHER DEALINGS IN THE SOFTWARE.
     (define (getter_ k) (cat-symbols 'getter_ k))
     (define (body_ k) (cat-symbols 'body_ k))
     (define (i_ k) (cat-symbols 'i_ k))
-    (define (max-arrays) 4)
+    (define (max-arrays) 6)
 
     (let ((result
            `(if (and (fx<= (length arrays) ,(max-arrays))
-                     (every (lambda (A)
-                              (and (specialized-array? A) (%%array-packed? A)))
-                            arrays))
+                     (every (lambda (A) (and (specialized-array? A) (%%array-packed? A))) arrays))
                 (case (length arrays)
                   ,@(map (lambda (k)
                            `((,k)
                              (let* ((domain (%%array-domain (car arrays)))
+                                    (lowers (%%interval-lower-bounds->list domain))
+                                    (number-of-elements (%%interval-volume domain))
                                     ,@(map (lambda (k)
-                                             `(,(base_ k) (apply (%%array-indexer (list-ref arrays ,k))
-                                                                 (%%interval-lower-bounds->list domain))))
+                                             `(,(base_ k) (apply (%%array-indexer (list-ref arrays ,k)) lowers)))
                                            (iota k))
                                     ,@(map (lambda (k)
                                              `(,(getter_ k) (storage-class-getter (%%array-storage-class (list-ref arrays ,k)))))
                                            (iota k))
                                     ,@(map (lambda (k)
                                              `(,(body_ k) (%%array-body (list-ref arrays ,k))))
-                                           (iota k))
-                                    (number-of-elements (%%interval-volume domain)))
+                                           (iota k)))
                                (do ((elements-remaining number-of-elements (fx- elements-remaining 1))
                                     ,@(map (lambda (k)
                                              `(,(i_ k) ,(base_ k) (fx+ ,(i_ k) 1)))
@@ -4625,10 +4625,9 @@ OTHER DEALINGS IN THE SOFTWARE.
   ;; safe in the face of (%%array-unsafe-getter array) capturing
   ;; the continuation using call/cc, as long as the
   ;; resulting list is not modified.
-  (%%interval-fold-left (lambda (a b) (cons b a))
-                        '()
-                        (%%array-domain array)
-                        (list (%%array-unsafe-getter array))))
+  (%%array-fold-left (lambda (a b) (cons b a))
+                     '()
+                     (list array)))
 
 (define (%%array->list array)
   ;; This is faster than using %%interval-fold-right
