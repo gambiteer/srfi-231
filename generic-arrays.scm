@@ -926,7 +926,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (define (%%interval-fold-left operator identity interval fs)
 
-  (define-macro (generate-one-f-code number-of-fs)
+  (define-macro (generate-code)
 
     (define (symbol-append . args)
       (string->symbol
@@ -939,13 +939,16 @@ OTHER DEALINGS IN THE SOFTWARE.
 
     (define (lower_ k) (symbol-append 'lower_ k))
     (define (upper_ k) (symbol-append 'upper_ k))
-    (define (i_ k) (symbol-append 'i_ k))
-    (define (loop_ k) (symbol-append 'loop_ k))
-    (define (f_ k) (symbol-append 'f_ k))
+    (define (i_ k)     (symbol-append 'i_ k))
+    (define (loop_ k)  (symbol-append 'loop_ k))
+    (define (f_ k)     (symbol-append 'f_ k))
+
+    (define-macro (max-number-of-dimensions) 4)
+    (define-macro (max-number-of-functions)  8)
 
     (define (make-loop index depth k)
       `(let ,(loop_ index) ((,(i_ index) ,(lower_ index))
-                                     (result result))
+                            (result result))
             (if (= ,(i_ index) ,(upper_ index))
                 ,(if (= index 0)
                      `result
@@ -953,128 +956,77 @@ OTHER DEALINGS IN THE SOFTWARE.
                 ,(if (= depth 0)
                      `(,(loop_ index)
                        (+ ,(i_ index) 1)
-                       (operator result ,@(map (lambda (l)
-                                                 `(,(f_ l) ,@(map (lambda (i) (i_ i)) (iota k))))
-                                               (iota number-of-fs))))
+                       (combiner result ,@(map i_ (iota k))))
                      (make-loop (+ index 1) (- depth 1) k)))))
 
-    (define (do-one-case k)
+    (define (do-one-case number-of-dimensions)
       (let ((result
-             `((,k)
+             `((,number-of-dimensions)
                (let (,@(map (lambda (j)
                               `(,(lower_ j) (%%interval-lower-bound interval ,j)))
-                            (iota k))
+                            (iota number-of-dimensions))
                      ,@(map (lambda (j)
                               `(,(upper_ j) (%%interval-upper-bound interval ,j)))
-                            (iota k))
-                     ,@(map (lambda (l)
-                              `(,(f_ l) (list-ref fs ,l)))
-                            (iota number-of-fs))
+                            (iota number-of-dimensions))
+                     (combiner
+                      (case (length fs)
+                        ,@(map (lambda (number-of-fs)
+                                 `((,number-of-fs)
+                                   (let (,@(map (lambda (l)
+                                                  `(,(f_ l) (list-ref fs ,l)))
+                                                (iota number-of-fs)))
+                                     (lambda (result ,@(map i_ (iota number-of-dimensions)))
+                                       (operator result ,@(map (lambda (k)
+                                                                 `(,(f_ k) ,@(map i_ (iota number-of-dimensions))))
+                                                               (iota number-of-fs)))))))
+                               (iota (max-number-of-functions) 1))
+                        (else
+                         (lambda (result ,@(map i_ (iota number-of-dimensions)))
+                           (apply operator result (map (lambda (f) (f ,@(map i_ (iota number-of-dimensions)))) fs))))))
                      (result identity))
-                 ,(make-loop 0 (- k 1) k)))))
-        result))
-
-    (let ((result
-           `(case (%%interval-dimension interval)
-              ((0) (operator identity ,@(map (lambda (l) `((list-ref fs ,l))) (iota number-of-fs))))
-              ,@(map do-one-case (iota 4 1))
-              (else
-               (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                     (reversed-uppers (reverse (%%interval-upper-bounds->list interval)))
-                     ,@(map (lambda (l)
-                              `(,(f_ l) (list-ref fs ,l)))
-                            (iota number-of-fs)))
-                 (let loop ((reversed-args reversed-lowers)
-                            (result identity))
-                   ;; There's at least one element of the interval, so we can
-                   ;; use a do-until loop
-                   (let* ((args (reverse reversed-args))
-                          (result (operator result ,@(map (lambda (l)
-                                                            `(apply ,(f_ l) args))
-                                                          (iota number-of-fs))))
-                          (next-reversed-args (%%get-next-args reversed-args
-                                                               reversed-lowers
-                                                               reversed-uppers)))
-                     (if next-reversed-args
-                         (loop next-reversed-args result)
-                         result))))))))
-      #;(pp result)
-      result))
-
-  (define-macro (generate-all-fs)
-
-    (define (symbol-append . args)
-      (string->symbol
-       (apply string-append (map (lambda (x)
-                                   (cond ((symbol? x) (symbol->string x))
-                                         ((number? x) (number->string x))
-                                         ((string? x) x)
-                                         (else (error "Arghh!"))))
-                                 args))))
-
-    (define (lower_ k) (symbol-append 'lower_ k))
-    (define (upper_ k) (symbol-append 'upper_ k))
-    (define (i_ k) (symbol-append 'i_ k))
-    (define (loop_ k) (symbol-append 'loop_ k))
-
-    (define (make-loop index depth k)
-      `(let ,(loop_ index) ((,(i_ index) ,(lower_ index))
-                                     (result result))
-            (if (= ,(i_ index) ,(upper_ index))
-                ,(if (= index 0)
-                     `result
-                     `(,(loop_ (- index 1)) (+ ,(i_ (- index 1)) 1) result))
-                ,(if (= depth 0)
-                     `(,(loop_ index)
-                       (+ ,(i_ index) 1)
-                       (apply operator result (map (lambda (f)
-                                                     (f ,@(map (lambda (i) (i_ i)) (iota k))))
-                                                   fs)))
-                     (make-loop (+ index 1) (- depth 1) k)))))
-
-    (define (do-one-case k)
-      (let ((result
-             `((,k)
-               (let (,@(map (lambda (j)
-                              `(,(lower_ j) (%%interval-lower-bound interval ,j)))
-                            (iota k))
-                     ,@(map (lambda (j)
-                              `(,(upper_ j) (%%interval-upper-bound interval ,j)))
-                            (iota k))
-                     (result identity))
-                 ,(make-loop 0 (- k 1) k)))))
+                 ,(make-loop 0 (- number-of-dimensions 1) number-of-dimensions)))))
+        #;(pp result)
         result))
 
     (let ((result
            `(case (%%interval-dimension interval)
               ((0) (apply operator identity (map (lambda (f) (f)) fs)))
-              ,@(map do-one-case (iota 4 1))
+              ,@(map do-one-case (iota (max-number-of-dimensions) 1))
               (else
                (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                     (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
+                     (reversed-uppers (reverse (%%interval-upper-bounds->list interval)))
+                     (combiner
+                      (case (length fs)
+                        ,@(map (lambda (number-of-fs)
+                                 `((,number-of-fs) (let (,@(map (lambda (l)
+                                                                  `(,(f_ l) (list-ref fs ,l)))
+                                                                (iota number-of-fs)))
+                                                     (lambda (result . indices)
+                                                       (operator result ,@(map (lambda (k)
+                                                                                 `(apply ,(f_ k) indices))
+                                                                               (iota number-of-fs)))))))
+                               (iota (max-number-of-functions) 1))
+                        (else
+                         (lambda (result . indices)
+                           (apply operator result (map (lambda (f) (apply f indices)) fs)))))))
                  (let loop ((reversed-args reversed-lowers)
                             (result identity))
                    ;; There's at least one element of the interval, so we can
                    ;; use a do-until loop
                    (let* ((args (reverse reversed-args))
-                          (result (apply operator result (map (lambda (f) (apply f args)) fs)))
+                          (result (apply combiner result args))
                           (next-reversed-args (%%get-next-args reversed-args
                                                                reversed-lowers
                                                                reversed-uppers)))
                      (if next-reversed-args
                          (loop next-reversed-args result)
                          result))))))))
-      #;(pp result)
+      #; (pp result)
       result))
 
   (if (%%interval-empty? interval) ;; handle (make-interval '#(10000000 10000000 0)) efficiently
       identity
-      (case (length fs)
-        ((1) (generate-one-f-code 1))
-        ((2) (generate-one-f-code 2))
-        ((3) (generate-one-f-code 3))
-        ((4) (generate-one-f-code 4))
-        (else (generate-all-fs)))))
+      (generate-code)))
 
 (define (interval-fold-right operator identity interval f . fs)
   (cond ((not (interval? interval))
@@ -1086,9 +1038,10 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%interval-fold-right operator identity interval (cons f fs)))))
 
+
 (define (%%interval-fold-right operator identity interval fs)
 
-  (define-macro (generate-one-f-code number-of-fs)
+  (define-macro (generate-code)
 
     (define (symbol-append . args)
       (string->symbol
@@ -1101,133 +1054,85 @@ OTHER DEALINGS IN THE SOFTWARE.
 
     (define (lower_ k) (symbol-append 'lower_ k))
     (define (upper_ k) (symbol-append 'upper_ k))
-    (define (i_ k) (symbol-append 'i_ k))
-    (define (loop_ k) (symbol-append 'loop_ k))
-    (define (f_ k) (symbol-append 'f_ k))
-    (define (item_ k) (symbol-append 'item_ k))
+    (define (i_ k)     (symbol-append 'i_ k))
+    (define (loop_ k)  (symbol-append 'loop_ k))
+    (define (f_ k)     (symbol-append 'f_ k))
+    (define (item_ k)  (symbol-append 'item_ k))
 
-    (define (make-loop index depth k)
-      `(let ,(loop_ index) ((,(i_ index) ,(lower_ index)))
-            (if (= ,(i_ index) ,(upper_ index))
-                ,(if (= index 0)
-                     `identity
-                     `(,(loop_ (- index 1)) (+ ,(i_ (- index 1)) 1)))
-                ,(if (= depth 0)
-                     `(let* (,@(map (lambda (l)
-                                      `(,(item_ l) (,(f_ l) ,@(map i_ (iota k)))))
-                                    (iota number-of-fs))
-                             (result (,(loop_ index) (+ ,(i_ index) 1))))
-                        (operator ,@(map item_ (iota number-of-fs)) result))
-                     (make-loop (+ index 1) (- depth 1) k)))))
+    (define-macro (max-number-of-dimensions) 4)
+    (define-macro (max-number-of-functions)  8)
 
-    (define (do-one-case k)
-      (let ((result
-             `((,k)
-               (let (,@(map (lambda (j)
-                              `(,(lower_ j) (%%interval-lower-bound interval ,j)))
-                            (iota k))
-                     ,@(map (lambda (j)
-                              `(,(upper_ j) (%%interval-upper-bound interval ,j)))
-                            (iota k))
-                     ,@(map (lambda (l)
-                              `(,(f_ l) (list-ref fs ,l)))
-                            (iota number-of-fs)))
-                 ,(make-loop 0 (- k 1) k)))))
-        result))
-
-    (let ((result
-           `(case (%%interval-dimension interval)
-              ((0) (operator ,@(map (lambda (l) `((list-ref fs ,l))) (iota number-of-fs)) identity))
-              ,@(map do-one-case (iota 4 1))
-              (else
-               (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
-                     (reversed-uppers (reverse (%%interval-upper-bounds->list interval)))
-                     ,@(map (lambda (l)
-                              `(,(f_ l) (list-ref fs ,l)))
-                            (iota number-of-fs)))
-                 (let loop ((reversed-args reversed-lowers))
-                   ;; Does not work if the interval is empty
-                   (if reversed-args
-                       (let* ((args (reverse reversed-args))
-                              ,@(map (lambda (k)
-                                       `(,(item_ k) (apply ,(f_ k) args)))
-                                     (iota number-of-fs))
-                              (result (loop (%%get-next-args reversed-args
-                                                               reversed-lowers
-                                                               reversed-uppers))))
-                         (operator ,@(map item_ (iota number-of-fs)) result))
-                       identity)))))))
-      #; (pp result)
-      result))
-
-  (define-macro (generate-all-fs)
-
-    (define (symbol-append . args)
-      (string->symbol
-       (apply string-append (map (lambda (x)
-                                   (cond ((symbol? x) (symbol->string x))
-                                         ((number? x) (number->string x))
-                                         ((string? x) x)
-                                         (else (error "Arghh!"))))
-                                 args))))
-
-    (define (lower_ k) (symbol-append 'lower_ k))
-    (define (upper_ k) (symbol-append 'upper_ k))
-    (define (i_ k) (symbol-append 'i_ k))
-    (define (loop_ k) (symbol-append 'loop_ k))
-
-    (define (make-loop index depth k)
-      `(let ,(loop_ index) ((,(i_ index) ,(lower_ index)))
-            (if (= ,(i_ index) ,(upper_ index))
-                ,(if (= index 0)
-                     `identity
-                     `(,(loop_ (- index 1)) (+ ,(i_ (- index 1)) 1)))
-                ,(if (= depth 0)
-                     `(let* ((items (map (lambda (f) (f ,@(map i_ (iota k)))) fs))
-                             (result (,(loop_ index) (+ ,(i_ index) 1))))
-                        (apply operator (append items (list result))))
-                     (make-loop (+ index 1) (- depth 1) k)))))
-
-    (define (do-one-case k)
-      (let ((result
-             `((,k)
-               (let (,@(map (lambda (j)
-                              `(,(lower_ j) (%%interval-lower-bound interval ,j)))
-                            (iota k))
-                     ,@(map (lambda (j)
-                              `(,(upper_ j) (%%interval-upper-bound interval ,j)))
-                            (iota k)))
-                 ,(make-loop 0 (- k 1) k)))))
+    (define (do-one-case number-of-dimensions)
+      (let* ((n number-of-dimensions)
+             (n-1 (- n 1))
+             (result
+             `((,n)
+               (letrec (,@(map (lambda (j)
+                                 `(,(lower_ j) (%%interval-lower-bound interval ,j)))
+                               (iota n))
+                        ,@(map (lambda (j)
+                                 `(,(upper_ j) (%%interval-upper-bound interval ,j)))
+                               (iota n))
+                        ,@(map (lambda (index depth)
+                                 `(,(loop_ index)
+                                   (lambda ,(map i_ (iota (+ index 1)))
+                                     (if (= ,(i_ index) ,(upper_ index))
+                                         ,(if (= index 0)
+                                              `identity
+                                              `(,(loop_ (- index 1)) ,@(map i_ (iota (- index 1))) (+ ,(i_ (- index 1)) 1)))
+                                         ,(if (= depth 0)
+                                              `(combiner ,@(map i_ (iota n)))
+                                              `(,(loop_ (+ index 1)) ,@(map i_ (iota (+ index 1))) ,(lower_ (+ index 1))))))))
+                               (iota n)
+                               (reverse (iota n)))
+                     (combiner
+                      (case (length fs)
+                        ,@(map (lambda (number-of-fs)
+                                 `((,number-of-fs)
+                                   (let (,@(map (lambda (l)
+                                                  `(,(f_ l) (list-ref fs ,l)))
+                                                (iota number-of-fs)))
+                                     (lambda (,@(map i_ (iota n)))
+                                       (let (,@(map (lambda (k)
+                                                      `(,(item_ k) (,(f_ k) ,@(map i_ (iota n)))))
+                                                    (iota number-of-fs)))
+                                         (let ((result (,(loop_ n-1) ,@(map i_ (iota n-1)) (+ ,(i_ n-1) 1))))
+                                         (operator ,@(map item_ (iota number-of-fs)) result)))))))
+                               (iota (max-number-of-functions) 1))
+                        (else
+                         (lambda (,@(map i_ (iota number-of-dimensions)))
+                           (let ((items
+                                  (map (lambda (f) (f ,@(map i_ (iota number-of-dimensions)))) fs)))
+                             (let ((result (,(loop_ n-1) ,@(map i_ (iota n-1)) (+ ,(i_ n-1) 1))))
+                               (apply operator (append items (list result))))))))))
+                 (loop_0 lower_0)))))
+        #;(pp result)
         result))
 
     (let ((result
            `(case (%%interval-dimension interval)
               ((0) (apply operator (append (map (lambda (f) (f)) fs) (list identity))))
-              ,@(map do-one-case (iota 4 1))
+              ,@(map do-one-case (iota (max-number-of-dimensions) 1))
               (else
                (let ((reversed-lowers (reverse (%%interval-lower-bounds->list interval)))
                      (reversed-uppers (reverse (%%interval-upper-bounds->list interval))))
                  (let loop ((reversed-args reversed-lowers))
-                   ;; Does not work if the interval is empty
+                   ;; There's at least one element of the interval, so we can
+                   ;; use a do-until loop
                    (if reversed-args
                        (let* ((args (reverse reversed-args))
                               (items (map (lambda (f) (apply f args)) fs))
                               (result (loop (%%get-next-args reversed-args
-                                                               reversed-lowers
-                                                               reversed-uppers))))
+                                                             reversed-lowers
+                                                             reversed-uppers))))
                          (apply operator (append items (list result))))
                        identity)))))))
-      #; (pp result)
+      #;(pp result)
       result))
 
   (if (%%interval-empty? interval) ;; handle (make-interval '#(10000000 10000000 0)) efficiently
       identity
-      (case (length fs)
-        ((1) (generate-one-f-code 1))
-        ((2) (generate-one-f-code 2))
-        ((3) (generate-one-f-code 3))
-        ((4) (generate-one-f-code 4))
-        (else (generate-all-fs)))))
+      (generate-code)))
 
 ;; We'll use the same basic container for all types of arrays.
 
@@ -4545,7 +4450,7 @@ OTHER DEALINGS IN THE SOFTWARE.
     (define (getter_ k) (cat-symbols 'getter_ k))
     (define (body_ k) (cat-symbols 'body_ k))
     (define (i_ k) (cat-symbols 'i_ k))
-    (define (max-arrays) 6)
+    (define (max-arrays) 4)
 
     (let ((result
            `(if (and (fx<= (length arrays) ,(max-arrays))
@@ -4571,9 +4476,10 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (iota k))
                                     (result id (op result ,@(map (lambda (k) `(,(getter_ k) ,(body_ k) ,(i_ k))) (iota k)))))
                                    ((eqv? elements-remaining 0) result)))))
-                         (iota (max-arrays) 1)))
+                         (iota (max-arrays) 1))
+                  (else #t))
                 (%%interval-fold-left op id (%%array-domain (car arrays)) (map %%array-unsafe-getter arrays)))))
-      #; (pp result)
+       #; (pp result)
       result))
 
     (generate-code))
@@ -4599,7 +4505,55 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%array-fold-right op id (cons array arrays)))))
 
 (define (%%array-fold-right op id arrays)
-  (%%interval-fold-right op id (%%array-domain (car arrays)) (map %%array-unsafe-getter arrays)))
+
+ (define-macro (generate-code)
+
+    (define (cat-symbols . args)
+      (define (->string arg)
+        (cond ((string? arg) arg)
+              ((number? arg) (number->string arg))
+              ((symbol? arg) (symbol->string arg))
+              (else (error "foo"))))
+      (string->symbol (apply string-append (map ->string args))))
+
+    (define (base_ k) (cat-symbols 'base_ k))
+    (define (getter_ k) (cat-symbols 'getter_ k))
+    (define (body_ k) (cat-symbols 'body_ k))
+    (define (i_ k) (cat-symbols 'i_ k))
+    (define (max-arrays) 4)
+
+    (let ((result
+           `(if (and (fx<= (length arrays) ,(max-arrays))
+                     (every (lambda (A) (and (specialized-array? A) (%%array-packed? A))) arrays))
+                (case (length arrays)
+                  ,@(map (lambda (k)
+                           `((,k)
+                             (let* ((domain (%%array-domain (car arrays)))
+                                    (last-valid-uppers
+                                     (map (lambda (x) (- x 1)) (%%interval-upper-bounds->list domain)))
+                                    (number-of-elements (%%interval-volume domain))
+                                    ,@(map (lambda (k)
+                                             `(,(base_ k) (apply (%%array-indexer (list-ref arrays ,k)) last-valid-uppers)))
+                                           (iota k))
+                                    ,@(map (lambda (k)
+                                             `(,(getter_ k) (storage-class-getter (%%array-storage-class (list-ref arrays ,k)))))
+                                           (iota k))
+                                    ,@(map (lambda (k)
+                                             `(,(body_ k) (%%array-body (list-ref arrays ,k))))
+                                           (iota k)))
+                               (do ((elements-remaining number-of-elements (fx- elements-remaining 1))
+                                    ,@(map (lambda (k)
+                                             `(,(i_ k) ,(base_ k) (fx- ,(i_ k) 1)))
+                                           (iota k))
+                                    (result id (op ,@(map (lambda (k) `(,(getter_ k) ,(body_ k) ,(i_ k))) (iota k)) result)))
+                                   ((eqv? elements-remaining 0) result)))))
+                         (iota (max-arrays) 1))
+                  (else #t))
+                (%%interval-fold-right op id (%%array-domain (car arrays)) (map %%array-unsafe-getter arrays)))))
+      #; (pp result)
+      result))
+
+    (generate-code))
 
 (define %%array-reduce
   (let ((%%array-reduce-base (list 'base)))
@@ -4630,8 +4584,10 @@ OTHER DEALINGS IN THE SOFTWARE.
                      (list array)))
 
 (define (%%array->list array)
-  ;; This is faster than using %%interval-fold-right
-  (reverse (%%array->reversed-list array)))
+  (if (and (specialized-array? array) (%%array-packed? array))
+      (%%array-fold-right cons '() (list array))
+      ;; This is faster than using %%interval-fold-right
+      (reverse (%%array->reversed-list array))))
 
 (define (array->list array)
   (cond ((not (array? array))
