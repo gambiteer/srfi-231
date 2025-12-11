@@ -3867,6 +3867,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (array-insert-axis array k #!optional (u_k 1))
   (cond ((not (and (exact-integer? u_k) (positive? u_k)))
          (error "array-insert-axis: The third argument is not a positive exact integer: " array k u_k))
+        ((and (< 1 u_k) (not (specialized-array? array)))
+         (error "array-insert-axis: The first argument is not a specialized array and the third argument is > 1: " array k u_k))
         ((not (array? array))
          (error "array-insert-axis: The first argument is not an array: " array k))
         ((not (and (exact-integer? k)

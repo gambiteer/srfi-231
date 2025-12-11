@@ -72,14 +72,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; comment one of the following two expressions.
 
-#;
+
 (begin
   (include "mini-arrays.scm")
 
   (define-macro (test-error expr value)
     #t))
 
-
+#;
 (begin
   (include "generic-arrays.scm")
 
@@ -2836,14 +2836,16 @@ OTHER DEALINGS IN THE SOFTWARE.
 (do ((i 0 (+ i 1)))
     ((= i random-tests))
   (let* ((outer-domain
-          (random-nonempty-interval 0 5))
+          (random-nonempty-interval 0 6))
+         (outer-domain-dimension
+          (interval-dimension outer-domain))
          (inner-domain
-          (random-interval 0 5))
+          (random-interval 0 (- 6 outer-domain-dimension)))
          (A
-          (array-copy (make-array (interval-cartesian-product outer-domain inner-domain)
-                                  (lambda args
-                                    (random 2)))
-                      u1-storage-class))
+          (array-copy! (make-array (interval-cartesian-product outer-domain inner-domain)
+                                   (lambda args
+                                     (random 2)))
+                       u1-storage-class))
          (A-curried
           (array-curry A (interval-dimension inner-domain)))
          (A-curried
@@ -3578,8 +3580,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 (do ((i 0 (fx+ i 1)))
     ((= i random-tests))
   (let* ((interval (random-interval))
-         (k (random (+ (interval-dimension interval) 1)))
-         (u_k (random 1 10)))
+         (k (random-inclusive (interval-dimension interval)))
+         (u_k (random 1 3)))
     (test (interval-insert-axis interval k)
           (my-interval-insert-axis interval k))
     (test (interval-insert-axis interval k u_k)
@@ -3661,13 +3663,36 @@ OTHER DEALINGS IN THE SOFTWARE.
             (make-array domain
                         (array-getter copy))))
          (k
-          (random (+ (interval-dimension domain) 1))))
+          (random-inclusive (interval-dimension domain))))
 
     (for-each (lambda (array)
                 (let ((A* (array-insert-axis array k))
+                      (A^ (my-array-insert-axis array k)))
+                  (test-error (array-insert-axis array k 2)
+                              "array-insert-axis: The first argument is not a specialized array and the third argument is > 1: ")
+                  (for-each (lambda (A)
+                              (test (specialized-array? A)
+                                    (specialized-array? array))
+                              (test (mutable-array? A)
+                                    (mutable-array? array))
+                              (test (array-domain A*)
+                                    (interval-insert-axis domain k))
+                              (test (array-domain A^)
+                                    (interval-insert-axis domain k))
+                              (test (myarray= A* A^)
+                                    #t))
+                            (list A* A^))))
+              (list mutable immutable))
+    (for-each (lambda (array)
+                (let ((A* (array-insert-axis array k))
                       (A^ (my-array-insert-axis array k))
-                      (B* (array-insert-axis array k 10))
-                      (B^ (my-array-insert-axis array k 10)))
+                      (B* (array-insert-axis array k 2))
+                      (B^ (my-array-insert-axis array k 2)))
+                  (test (apply = (map (lambda (a)
+                                        ((storage-class-length (array-storage-class a))
+                                         (array-body a)))
+                                      (list A* A^ B* B^)))
+                        #t)
                   (for-each (lambda (A)
                               (test (specialized-array? A)
                                     (specialized-array? array))
@@ -3678,9 +3703,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                               (test (array-domain A^)
                                     (interval-insert-axis domain k))
                               (test (array-domain B*)
-                                    (interval-insert-axis domain k 10))
+                                    (interval-insert-axis domain k 2))
                               (test (array-domain B^)
-                                    (interval-insert-axis domain k 10))
+                                    (interval-insert-axis domain k 2))
                               (test (myarray= A* A^)
                                     #t)
                               (test (myarray= B* B^)
@@ -3693,7 +3718,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                               (array-curry (array-permute A^ (index-first (array-dimension A^) k))
                                                            (array-dimension array))))
                             (list A^ B^))))
-              (list specialized immutable-specialized mutable immutable))))
+              (list immutable-specialized specialized))))
 
 (next-test-random-source-state!)
 
