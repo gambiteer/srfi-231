@@ -69,7 +69,6 @@ OTHER DEALINGS IN THE SOFTWARE.
   (upper-bounds read-only:)      ;; a vector of exact integers u_0,...,u_n-1
   )
 
-
 (define-type %%array
   id: db6d2b47-bd45-4638-a0e1-8f95a16ab792
   copier: #f
@@ -1038,7 +1037,6 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%interval-fold-right operator identity interval (cons f fs)))))
 
-
 (define (%%interval-fold-right operator identity interval fs)
 
   (define-macro (generate-code)
@@ -1146,7 +1144,6 @@ OTHER DEALINGS IN THE SOFTWARE.
          bool
          (error "specialized-array-default-mutable?: The argument is not a boolean: " bool)))))
 
-
 ;; An array has a domain (which is an interval) and an getter that maps that domain into some type of
 ;; Scheme objects
 
@@ -1229,7 +1226,6 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "array-dimension: The argument is not an array: " array))
         (else
          (%%array-dimension array))))
-
 
 ;;;
 ;;; A mutable array has, in addition a setter, that satisfies, roughly
@@ -2088,7 +2084,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                (cdr increments)))))))))
     result))
 
-
 ;;;
 ;;; The default getter and the setter of a specialized-array a are given by
 ;;;
@@ -2385,7 +2380,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                       (else
                        (apply unsafe-setter value multi-index) (void))))))))
 
-
 (define (%%finish-specialized-array domain storage-class body indexer mutable? in-order?)
   (let ((storage-class-getter (storage-class-getter storage-class))
         (storage-class-setter (storage-class-setter storage-class))
@@ -2536,7 +2530,6 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "make-specialized-array-from-data: The first argument is not compatible with the storage class: " data))
         (else
          (%%make-specialized-array-from-data data storage-class (and mutable? (##mutable? data))))))
-
 
 (define (%%make-specialized-array-from-data data storage-class mutable?)
   (let* ((body
@@ -3114,7 +3107,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (define array-copy! (%%make-array-copy #f))
 
-
 (define (%%compute-multi-index-increments lowers uppers)
   ;; lowers and uppers are lists of lower and upper bounds
   ;; This function returns all lowers first, then a list of
@@ -3203,7 +3195,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                 (%%compose-indexers old-indexer new-domain new-domain->old-domain)
                                 (mutable-array? array)
                                 in-order?)))
-
 
 (define (specialized-array-share array
                                  new-domain
@@ -3766,8 +3757,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                        (* s i))
                                                      indices scales)))))))))))
 
-
-
   (let ((result
          `(begin
             ,(sampler '%%getter values)
@@ -3775,7 +3764,6 @@ OTHER DEALINGS IN THE SOFTWARE.
     result))
 
 (macro-generate-sample)
-
 
 (define (%%immutable-array-sample array scales)
   (%%make-safer-array (%%interval-scale (%%array-domain array) scales)
@@ -4874,7 +4862,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                      (storage-class generic-storage-class)
                      (mutable?      (specialized-array-default-mutable?)))
   (%%array-stack k arrays storage-class mutable? #t))
-
 
 (define (array-stack! k
                       arrays
