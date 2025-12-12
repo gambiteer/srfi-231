@@ -72,14 +72,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; comment one of the following two expressions.
 
-
+#;
 (begin
   (include "mini-arrays.scm")
 
   (define-macro (test-error expr value)
     #t))
 
-#;
+
 (begin
   (include "generic-arrays.scm")
 
@@ -6152,6 +6152,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                               u8-storage-class
                               'a)
                  (wrap "The third argument is not a boolean: "))
+
+     (test-error (array-block (make-array (make-interval '#(2 0)) list)) ;; nonsense getter
+                 (wrap "The first argument is an empty array: "))
 
      (test-error (array-block (make-array (make-interval '#(2 2)) list))
                  (wrap "Not all elements of the first argument (an array) are arrays: "))

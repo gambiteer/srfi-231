@@ -6144,6 +6144,9 @@ that computes the componentwise products when we need them, the times are
                         'a)
            (wrap "The third argument is not a boolean: "))
 
+     (test (array-block (make-array (make-interval '#(2 0)) list)) ;; nonsense getter
+           (wrap "The first argument is an empty array: "))
+
      (test (array-block (make-array (make-interval '#(2 2)) list))
            (wrap "Not all elements of the first argument (an array) are arrays: "))
 
