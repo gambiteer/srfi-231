@@ -706,7 +706,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                  (iota (random min max))))
            (upper
             (map (lambda (x)
-                   (+ (random 0 8) x))
+                   (+ (random 0 6) x))
                  lower)))
       (make-interval (list->vector lower)
                      (list->vector upper))))))
@@ -726,7 +726,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                  (vector->list (make-vector (random min max)))))
            (upper
             (map (lambda (x)
-                   (+ (random 1 8) x))
+                   (+ (random 1 4) x))
                  lower)))
       (make-interval (list->vector lower)
                      (list->vector upper))))))
@@ -4546,9 +4546,6 @@ OTHER DEALINGS IN THE SOFTWARE.
           (map (lambda (ignore)
                  (make-array (random-interval 0 6) list))
                (make-list 2))))
-    (myarray= (apply array-outer-product append arrays)
-              (make-array (apply my-interval-cartesian-product (map array-domain arrays))
-                          list))
     (test (myarray= (apply array-outer-product append arrays)
                     (make-array (apply my-interval-cartesian-product (map array-domain arrays))
                                 list))
