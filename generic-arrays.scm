@@ -4170,9 +4170,8 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; We try to specialize this function to speed things up a bit.
 ;;;
 
-(define (%%specialize-function-applied-to-array-getters f array arrays)
-  (let ((domain (%%array-domain array))
-        (arrays (cons array arrays)))
+(define (%%specialize-function-applied-to-array-getters f arrays)
+  (let ((domain (%%array-domain (car arrays))))
 
     (define-macro (generate-cases)
 
@@ -4232,24 +4231,27 @@ OTHER DEALINGS IN THE SOFTWARE.
 
     (generate-cases)))
 
-(define (%%array-map f array arrays)
+(define (%%array-map f arrays)
   ;; unsafe, for internal use on known intervals
-  (%%make-safer-array (%%array-domain array)
-                      (%%specialize-function-applied-to-array-getters f array arrays)))
+  (%%make-safer-array (%%array-domain (car arrays))
+                      (%%specialize-function-applied-to-array-getters f arrays)))
 
 (define (array-map f array #!rest arrays)
-  (cond ((not (procedure? f))
-         (apply error "array-map: The first argument is not a procedure: " f array arrays))
-        ((not (every array? (cons array arrays)))
-         (apply error "array-map: Not all arguments after the first are arrays: " f array arrays))
-        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
-         (apply error "array-map: Not all arrays have the same domain: " f array arrays))
-        (else
-         (%%array-map f array arrays))))
+  (let ((arrays (cons array arrays)))
+    (cond ((not (procedure? f))
+           (apply error "array-map: The first argument is not a procedure: " f arrays))
+          ((not (every array? arrays))
+           (apply error "array-map: Not all arguments after the first are arrays: " f arrays))
+          ((not (every (lambda (A) (%%interval= (%%array-domain A)
+                                                (%%array-domain array)))
+                       (cdr arrays)))
+           (apply error "array-map: Not all arrays have the same domain: " f arrays))
+          (else
+           (%%array-map f arrays)))))
 
 ;;; applies f to the elements of the arrays in lexicographical order.
 
-(define (%%array-for-each f array arrays)
+(define (%%array-for-each f arrays)
 
   (define-macro (generate-code)
 
@@ -4269,51 +4271,54 @@ OTHER DEALINGS IN THE SOFTWARE.
     (define (max-arrays) 4)
 
     (let ((result
-           `(if (and (fx< (length arrays) ,(max-arrays))
+           `(if (and (fx<= (length arrays) ,(max-arrays))
                      (every (lambda (A)
-                              (and (specialized-array? A) (%%array-packed? A)))
-                            (cons array arrays)))
-                (let ((arrays (cons array arrays)))
-                  (case (length arrays)
-                    ,@(map (lambda (k)
-                             `((,k)
-                               (let* ((domain (%%array-domain (car arrays)))
-                                      ,@(map (lambda (k)
-                                               `(,(base_ k) (apply (%%array-indexer (list-ref arrays ,k))
-                                                                   (%%interval-lower-bounds->list domain))))
-                                             (iota k))
-                                      ,@(map (lambda (k)
-                                               `(,(getter_ k) (storage-class-getter (%%array-storage-class (list-ref arrays ,k)))))
-                                             (iota k))
-                                      ,@(map (lambda (k)
-                                               `(,(body_ k) (%%array-body (list-ref arrays ,k))))
-                                             (iota k))
-                                      (number-of-elements (%%interval-volume domain)))
-                                 (do ((elements-remaining number-of-elements (fx- elements-remaining 1))
-                                      ,@(map (lambda (k)
-                                               `(,(i_ k) ,(base_ k) (fx+ ,(i_ k) 1)))
-                                             (iota k)))
-                                     ((eqv? elements-remaining 0) (void))
-                                   (f ,@(map (lambda (k)
-                                               `(,(getter_ k) ,(body_ k) ,(i_ k)))
-                                             (iota k)))))))
-                           (iota (max-arrays) 1))))
-                (%%interval-for-each (%%specialize-function-applied-to-array-getters f array arrays)
-                                     (%%array-domain array)))))
+                              (and (specialized-array? A)
+                                   (%%array-packed? A)))
+                            arrays))
+                (case (length arrays)
+                  ,@(map (lambda (k)
+                           `((,k)
+                             (let* ((domain (%%array-domain (car arrays)))
+                                    ,@(map (lambda (k)
+                                             `(,(base_ k) (apply (%%array-indexer (list-ref arrays ,k))
+                                                                 (%%interval-lower-bounds->list domain))))
+                                           (iota k))
+                                    ,@(map (lambda (k)
+                                             `(,(getter_ k) (storage-class-getter (%%array-storage-class (list-ref arrays ,k)))))
+                                           (iota k))
+                                    ,@(map (lambda (k)
+                                             `(,(body_ k) (%%array-body (list-ref arrays ,k))))
+                                           (iota k))
+                                    (number-of-elements (%%interval-volume domain)))
+                               (do ((elements-remaining number-of-elements (fx- elements-remaining 1))
+                                    ,@(map (lambda (k)
+                                             `(,(i_ k) ,(base_ k) (fx+ ,(i_ k) 1)))
+                                           (iota k)))
+                                   ((eqv? elements-remaining 0) (void))
+                                 (f ,@(map (lambda (k)
+                                             `(,(getter_ k) ,(body_ k) ,(i_ k)))
+                                           (iota k)))))))
+                         (iota (max-arrays) 1)))
+                (%%interval-for-each (%%specialize-function-applied-to-array-getters f arrays)
+                                     (%%array-domain (car arrays))))))
       #;(pp result)
       result))
 
   (generate-code))
 
 (define (array-for-each f array #!rest arrays)
-  (cond ((not (procedure? f))
-         (apply error "array-for-each: The first argument is not a procedure: " f array arrays))
-        ((not (every array? (cons array arrays)))
-         (apply error "array-for-each: Not all arguments after the first are arrays: " f array arrays))
-        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
-         (apply error "array-for-each: Not all arrays have the same domain: " f array arrays))
-        (else
-         (%%array-for-each f array arrays))))
+  (let ((arrays (cons array arrays)))
+    (cond ((not (procedure? f))
+           (apply error "array-for-each: The first argument is not a procedure: " f arrays))
+          ((not (every array? arrays))
+           (apply error "array-for-each: Not all arguments after the first are arrays: " f arrays))
+          ((not (every (lambda (A) (%%interval= (%%array-domain A)
+                                                (%%array-domain array)))
+                       (cdr arrays)))
+           (apply error "array-for-each: Not all arrays have the same domain: " f arrays))
+          (else
+           (%%array-for-each f arrays)))))
 
 (define-macro (macro-make-predicates)
 
@@ -4398,33 +4403,41 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (macro-make-predicates)
 
-(define (%%array-every f array arrays)
-  (%%interval-every (%%specialize-function-applied-to-array-getters f array arrays)
-                    (%%array-domain array)))
+(define (%%array-every f arrays)
+  (%%interval-every (%%specialize-function-applied-to-array-getters f arrays)
+                    (%%array-domain (car arrays))))
 
 (define (array-every f array #!rest arrays)
-  (cond ((not (procedure? f))
-         (apply error "array-every: The first argument is not a procedure: " f array arrays))
-        ((not (every array? (cons array arrays)))
-         (apply error "array-every: Not all arguments after the first are arrays: " f array arrays))
-        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
-         (apply error "array-every: Not all arrays have the same domain: " f array arrays))
-        (else
-         (%%array-every f array arrays))))
+  (let ((arrays (cons array arrays)))
+    (cond ((not (procedure? f))
+           (apply error "array-every: The first argument is not a procedure: " f arrays))
+          ((not (every array? arrays))
+           (apply error "array-every: Not all arguments after the first are arrays: " f arrays))
+          ((not (every (lambda (A)
+                         (%%interval= (%%array-domain A)
+                                      (%%array-domain array)))
+                       (cdr arrays)))
+           (apply error "array-every: Not all arrays have the same domain: " f arrays))
+          (else
+           (%%array-every f arrays)))))
 
-(define (%%array-any f array arrays)
-  (%%interval-any (%%specialize-function-applied-to-array-getters f array arrays)
-                  (%%array-domain array)))
+(define (%%array-any f arrays)
+  (%%interval-any (%%specialize-function-applied-to-array-getters f arrays)
+                  (%%array-domain (car arrays))))
 
 (define (array-any f array #!rest arrays)
-  (cond ((not (procedure? f))
-         (apply error "array-any: The first argument is not a procedure: " f array arrays))
-        ((not (every array? (cons array arrays)))
-         (apply error "array-any: Not all arguments after the first are arrays: " f array arrays))
-        ((not (every (lambda (d) (%%interval= d (%%array-domain array))) (map %%array-domain arrays)))
-         (apply error "array-any: Not all arrays have the same domain: " f array arrays))
-        (else
-         (%%array-any f array arrays))))
+  (let ((arrays (cons array arrays)))
+    (cond ((not (procedure? f))
+           (apply error "array-any: The first argument is not a procedure: " f arrays))
+          ((not (every array? arrays))
+           (apply error "array-any: Not all arguments after the first are arrays: " f arrays))
+          ((not (every (lambda (A)
+                         (%%interval= (%%array-domain A)
+                                      (%%array-domain array)))
+                       (cdr arrays)))
+           (apply error "array-any: Not all arrays have the same domain: " f arrays))
+          (else
+           (%%array-any f arrays)))))
 
 (define (%%array-fold-left op id arrays)
 
@@ -4477,24 +4490,32 @@ OTHER DEALINGS IN THE SOFTWARE.
     (generate-code))
 
 (define (array-fold-left op id array . arrays)
-  (cond ((not (procedure? op))
-         (apply error "array-fold-left: The first argument is not a procedure: " op id array arrays))
-        ((not (every array? (cons array arrays)))
-         (apply error "array-fold-left: Not all arguments after the first two are arrays: " op id array arrays))
-        ((not (every (lambda (a) (%%interval= (%%array-domain a) (%%array-domain array))) arrays))
-         (apply error "array-fold-left: Not all arrays have the same domain: " op id array arrays))
-        (else
-         (%%array-fold-left op id (cons array arrays)))))
+  (let ((arrays (cons array arrays)))
+    (cond ((not (procedure? op))
+           (apply error "array-fold-left: The first argument is not a procedure: " op id arrays))
+          ((not (every array? arrays))
+           (apply error "array-fold-left: Not all arguments after the first two are arrays: " op id arrays))
+          ((not (every (lambda (a)
+                         (%%interval= (%%array-domain a)
+                                      (%%array-domain array)))
+                       (cdr arrays)))
+           (apply error "array-fold-left: Not all arrays have the same domain: " op id arrays))
+          (else
+           (%%array-fold-left op id arrays)))))
 
 (define (array-fold-right op id array . arrays)
-  (cond ((not (procedure? op))
-         (apply error "array-fold-right: The first argument is not a procedure: " op id array arrays))
-        ((not (every array? (cons array arrays)))
-         (apply error "array-fold-right: Not all arguments after the first two are arrays: " op id array arrays))
-        ((not (every (lambda (a) (%%interval= (%%array-domain a) (%%array-domain array))) arrays))
-         (apply error "array-fold-right: Not all arrays have the same domain: " op id array arrays))
-        (else
-         (%%array-fold-right op id (cons array arrays)))))
+  (let ((arrays (cons array arrays)))
+    (cond ((not (procedure? op))
+           (apply error "array-fold-right: The first argument is not a procedure: " op id arrays))
+          ((not (every array? arrays))
+           (apply error "array-fold-right: Not all arguments after the first two are arrays: " op id arrays))
+          ((not (every (lambda (a)
+                         (%%interval= (%%array-domain a)
+                                      (%%array-domain array)))
+                       arrays))
+           (apply error "array-fold-right: Not all arrays have the same domain: " op id array arrays))
+          (else
+           (%%array-fold-right op id arrays)))))
 
 (define (%%array-fold-right op id arrays)
 
@@ -4752,7 +4773,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                  ((1) (%%array->list a))
                  (else
                   (%%array->list
-                   (%%array-map a->l (%%array-curry a (fx- dim 1)) '()))))))
+                   (%%array-map a->l (list (%%array-curry a (fx- dim 1)))))))))
            (a->l array)))))
 
 (define (array->vector* array)
@@ -4767,7 +4788,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                  ((1) (%%array->vector a))
                  (else
                   (%%array->vector
-                   (%%array-map a->v (%%array-curry a (fx- dim 1)) '()))))))
+                   (%%array-map a->v (list (%%array-curry a (fx- dim 1)))))))))
            (a->v array)))))
 
 (define (array-assign! destination source)
@@ -4789,7 +4810,7 @@ OTHER DEALINGS IN THE SOFTWARE.
   ;; Copy the curried arrays for efficiency.
   (%%array-outer-product
    (lambda (a b)
-     (%%array-reduce f (%%array-map g a (list b))))
+     (%%array-reduce f (%%array-map g (list a b))))
    (array-copy (%%array-curry A 1))
    (array-copy (%%array-curry (%%array-permute B (%%index-rotate (%%array-dimension B) 1)) 1))))
 
@@ -4849,8 +4870,8 @@ OTHER DEALINGS IN THE SOFTWARE.
     ;; copy each array argument to the associated place in stack
     (%%array-for-each (lambda (destination source)
                         (%%move-array-elements destination source caller))
-                      permuted-and-curried-result
-                      (list (%%list->array (make-interval (vector number-of-arrays))
+                      (list permuted-and-curried-result
+                            (%%list->array (make-interval (vector number-of-arrays))
                                            arrays
                                            generic-storage-class
                                            #f
@@ -5032,18 +5053,17 @@ OTHER DEALINGS IN THE SOFTWARE.
          (let* ((A   (array-copy A-arg))
                 (A_  (%%array-unsafe-getter A))
                 (A_D (%%array-domain A)))
-           (if (not (%%array-every array? A '()))
+           (if (not (%%array-every array? (list A)))
                (error (string-append caller "Not all elements of the first argument (an array) are arrays: ") A-arg)
                (let* ((first-element (apply A_ (%%interval-lower-bounds->list A_D)))
                       (first-domain  (%%array-domain first-element)))
-                 (if (not (%%array-every  (lambda (a) (%%interval= (%%array-domain a) first-domain)) A '()))
+                 (if (not (%%array-every  (lambda (a) (%%interval= (%%array-domain a) first-domain)) (list A)))
                      (error (string-append caller "Not all elements of the first argument (an array) have the domain: ") A-arg)
                      (let* ((A (if (and call/cc-safe?
-                                        (not (%%array-every specialized-array? A '())))
+                                        (not (%%array-every specialized-array? (list A))))
                                    (%%->specialized-array (%%array-map (lambda (A)
                                                                          (%%->specialized-array A storage-class caller))
-                                                                       A
-                                                                       '())
+                                                                       (list A))
                                                           generic-storage-class
                                                           caller)
                                    A))
@@ -5056,7 +5076,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (%%move-array-elements result
                                                                   argument
                                                                   caller))
-                                         curried-result (list A))
+                                         (list curried-result A))
                        (if (not mutable?)
                            (%%array-freeze! result)
                            result)))))))))
@@ -5093,9 +5113,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                 (A_D              (%%array-domain A))
                 (A_dim            (%%interval-dimension A_D))
                 (ks               (list->vector (iota A_dim))))
-           (cond ((not (%%array-every array? A '()))
+           (cond ((not (%%array-every array? (list A)))
                   (error (string-append caller "Not all elements of the first argument (an array) are arrays: ") A-arg))
-                 ((not (%%array-every (lambda (a) (fx= (%%array-dimension a) A_dim)) A '()))
+                 ((not (%%array-every (lambda (a) (fx= (%%array-dimension a) A_dim)) (list A)))
                   (error (string-append caller "Not all elements of the first argument (an array) have the same dimension as the first argument itself: ") A-arg))
                  ((not (vector-every
                         (lambda (k)       ;; the direction
@@ -5110,7 +5130,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (%%array->list slice))))
                                  (or (null? kth-width-of-arrays-in-slice)
                                      (every (lambda (w) (= (car kth-width-of-arrays-in-slice) w)) (cdr kth-width-of-arrays-in-slice)))))
-                             slices '())))
+                             (list slices))))
                         ks))
                   (error (string-append caller "Cannot stack array elements of the first argument into result array: ") A-arg))
                  (else
@@ -5138,11 +5158,10 @@ OTHER DEALINGS IN THE SOFTWARE.
                            ks))
                          (A
                           (if (and call/cc-safe?
-                                   (not (%%array-every specialized-array? A '())))
+                                   (not (%%array-every specialized-array? (list A))))
                               (%%->specialized-array (%%array-map (lambda (A)
                                                                     (%%->specialized-array A storage-class caller))
-                                                                  A
-                                                                  '())
+                                                                  (list A))
                                                      generic-storage-class
                                                      caller)
                               A))

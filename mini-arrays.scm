@@ -1545,17 +1545,17 @@
                                            (apply getter (append left-multi-index right-multi-index))))))))))))
 
 
-(define (%%specialize-function-applied-to-array-getters f array arrays)
-  (let ((getters (map array-getter (cons array arrays))))
+(define (%%specialize-function-applied-to-array-getters f arrays)
+  (let ((getters (map array-getter arrays)))
     (lambda multi-index
       (apply f (map (lambda (g) (apply g multi-index)) getters)))))
 
 (define (array-map f array . arrays)
   (make-array (array-domain array)
-              (%%specialize-function-applied-to-array-getters f array arrays)))
+              (%%specialize-function-applied-to-array-getters f (cons array arrays))))
 
 (define (array-for-each f array . arrays)
-  (interval-for-each (%%specialize-function-applied-to-array-getters f array arrays)
+  (interval-for-each (%%specialize-function-applied-to-array-getters f (cons array arrays))
                      (array-domain array)))
 
 (define (%%interval-every f interval)
@@ -1587,11 +1587,11 @@
                         (- index 1))))))))
 
 (define (array-every f array . arrays)
-  (%%interval-every (%%specialize-function-applied-to-array-getters f array arrays)
+  (%%interval-every (%%specialize-function-applied-to-array-getters f (cons array arrays))
                     (array-domain array)))
 
 (define (array-any f array . arrays)
-  (%%interval-any (%%specialize-function-applied-to-array-getters f array arrays)
+  (%%interval-any (%%specialize-function-applied-to-array-getters f (cons array arrays))
                   (array-domain array)))
 
 (define (array-fold-left op left-id array . arrays)

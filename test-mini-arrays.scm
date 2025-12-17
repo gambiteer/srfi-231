@@ -72,14 +72,14 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 ;;; comment one of the following two expressions.
 
-#;
+
 (begin
   (include "mini-arrays.scm")
 
   (define-macro (test-error expr value)
     #t))
 
-
+#;
 (begin
   (include "generic-arrays.scm")
 
