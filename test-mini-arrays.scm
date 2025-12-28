@@ -3601,13 +3601,13 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 10)
             "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): ")
 
-(test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 'a)
+(test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 1 'a)
             "array-insert-axis: The third argument is not a positive exact integer: ")
 
-(test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 1.)
+(test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 1 1.)
             "array-insert-axis: The third argument is not a positive exact integer: ")
 
-(test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 10 0)
+(test-error (array-insert-axis (make-array (make-interval '#(1 1)) list) 1 0)
             "array-insert-axis: The third argument is not a positive exact integer: ")
 
 (define my-array-insert-axis
@@ -3719,6 +3719,159 @@ OTHER DEALINGS IN THE SOFTWARE.
                                                            (array-dimension array))))
                             (list A^ B^))))
               (list immutable-specialized specialized))))
+
+(next-test-random-source-state!)
+
+(pp "array-broadcast tests")
+
+(test-error (array-broadcast 'a 'a)
+           "array-broadcast: The first argument is not an array: " )
+
+(test-error (array-broadcast (array-copy (make-array (make-interval '#()) list)) 'a)
+            "array-broadcast: The second argument is not an interval: ")
+
+(test-error (array-broadcast (array-copy (make-array (make-interval '#(10)) list)) (make-interval '#(2 2)))
+            "array-broadcast: The first argument cannot be broadcast to the second argument: ")
+
+(test-error (array-broadcast (array-copy (make-array (make-interval '#(10)) list)) (make-interval '#()))
+            "array-broadcast: The first argument cannot be broadcast to the second argument: ")
+
+(test-error (array-broadcast (make-array (make-interval '#(10)) list) (make-interval '#()))
+            "array-broadcast: The first argument cannot be broadcast to the second argument: ")
+
+(test-error (array-broadcast (make-array (make-interval '#(10)) list) (make-interval '#(10 10)))
+            "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: ")
+
+(test (myarray= (array-broadcast (list->array (make-interval '#(2 1 3)) (iota 6)) (make-interval '#(2 5 3)))
+                (array-insert-axis (list->array (make-interval '#(2 3)) (iota 6)) 1 5))
+      #t)
+
+(define (my-array-broadcast array new-domain)
+
+  ;; This is just the code from mini-arrays.scm, so the test
+  ;; of both codes is that they agree when running this with
+  ;; generic-arrays.scm
+
+  (define (getter-broadcast getter)
+    (let* ((left-dimensions-to-drop
+            (- (interval-dimension new-domain)
+               (array-dimension array)))
+           (old-uppers
+            (interval-upper-bounds->list (array-domain array)))
+           (new-uppers
+            (drop (interval-upper-bounds->list new-domain) left-dimensions-to-drop)))
+      (lambda args
+        (apply getter (map (lambda (arg old-upper new-upper)
+                             (if (< old-upper new-upper)
+                                 0
+                                 arg))
+                           (drop args left-dimensions-to-drop)
+                           old-uppers
+                           new-uppers)))))
+
+  (cond ((not (let ((broadcast-domain
+                     (apply compute-broadcast-interval (list (array-domain array) new-domain))))
+                (and broadcast-domain
+                     (interval= broadcast-domain new-domain))))
+         (error "array-broadcast: array is not compatible with new-domain: " array new-domain))
+        ((specialized-array? array)
+         (%%array-freeze!
+          (specialized-array-share array
+                                   new-domain
+                                   (getter-broadcast values))))
+        ((mutable-array? array)
+         (make-array new-domain
+                     (getter-broadcast (array-getter array))
+                     (setter-broadcast (array-setter array))))
+        (else
+         (make-array new-domain
+                     (getter-broadcast (array-getter array))))))
+
+;;; What's the idea here?
+
+;;; We take a 3 x 3 x 3 array of random integers
+;;; We apply a random reverse and permute to it to screw up the ordering
+;;; We then extract an array of dimension "dimension" between 0 and 3 inclusive,
+;;; of width 2 on each axis, with a random offset of a random multi-index of
+;;; length 3 and entries 0 or 1 (so it sits in the 3 x 3 x 3 array)
+
+(do ((i 0 (fx+ i 1)))
+    ((fx= i random-tests))
+  (let* ((a-t-b-s-a-b                 ;; array-to-be-sampled-and-broadcast (it's really extracted, not sampled)
+          (array-copy
+           (make-array (make-interval '#(3 3 3))
+                       (lambda args (random-integer 256)))
+           generic-storage-class
+           #t)) ;; make it mutable
+         (a-t-b-s-a-s
+          (array-reverse
+           a-t-b-s-a-b
+           (vector-map (lambda args (random-boolean))
+                       (make-vector 3))))
+         (a-t-b-s-a-s
+          (array-permute
+           a-t-b-s-a-b
+           (random-permutation 3)))
+         (larger-dimension
+          (random-integer 6))
+         (larger-domain
+          (make-interval (make-vector larger-dimension 2)))
+         (target-array
+          (array-copy
+           (make-array larger-domain
+                       (lambda args (random-integer 65536)))))
+         (dimension
+          (random-inclusive 0 (min 3 larger-dimension)))
+         (new-domain
+          (make-interval (make-vector dimension 2)))
+         (a-t-b-b       ;; array-to-be-broadcast
+          (let* ((random-offset
+                  (map (lambda args
+                         (random 2))
+                       (iota 3))))  ;; the dimension of a-t-b-s-a-b
+            (specialized-array-share a-t-b-s-a-b
+                                     new-domain
+                                     (lambda args
+                                       (apply values
+                                              (map + random-offset (append (make-list (- 3 dimension) 0) args)))))))
+         (m-a-t-b-b
+          (make-array (array-domain a-t-b-b)
+                      (array-getter a-t-b-b)
+                      (array-setter a-t-b-b)))
+         (i-a-t-b-b
+          (make-array (array-domain a-t-b-b)
+                      (array-getter a-t-b-b)))
+         (broadcast-specialized
+          (array-broadcast a-t-b-b larger-domain)))
+
+    (test (mutable-array? broadcast-specialized)
+          (= (interval-volume larger-domain)
+             (interval-volume new-domain)))
+    (test (myarray= (array-map fxxor target-array broadcast-specialized)
+                    (array-map fxxor target-array (my-array-broadcast a-t-b-b larger-domain)))
+          #t)
+
+    (if (= (interval-volume larger-domain)
+           (interval-volume new-domain))
+        (let* ((broadcast-mutable
+                (array-broadcast m-a-t-b-b larger-domain))
+               (broadcast-immutable
+                (array-broadcast i-a-t-b-b larger-domain)))
+          (test (mutable-array? broadcast-mutable)
+                #t)
+          (test (mutable-array? broadcast-immutable)
+                #f)
+          (test (myarray= (array-map fxxor target-array broadcast-mutable)
+                          (array-map fxxor target-array (my-array-broadcast a-t-b-b larger-domain)))
+                #t)
+          (test (myarray= (array-map fxxor target-array broadcast-immutable)
+                          (array-map fxxor target-array (my-array-broadcast a-t-b-b larger-domain)))
+                #t))
+        (begin
+          (test-error (array-broadcast m-a-t-b-b larger-domain)
+                      "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: ")
+          (test-error (array-broadcast i-a-t-b-b larger-domain)
+                      "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: ")))))
 
 (next-test-random-source-state!)
 

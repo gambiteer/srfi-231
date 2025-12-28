@@ -1513,6 +1513,54 @@
              (make-array new-domain
                          (getter-delete (array-getter array) k))))))))
 
+(define (array-broadcast array new-domain)
+  (if (interval= (array-domain array) new-domain)
+      array
+      (let* ((new-dimension (interval-dimension new-domain))
+             (args-to-trim (- new-dimension (array-dimension array))))
+        (cond ((specialized-array? array)
+               (let ((old-uppers
+                      (interval-upper-bounds->list (array-domain array)))
+                     (new-uppers
+                      (drop (interval-upper-bounds->list new-domain)
+                            args-to-trim)))
+
+                 (define (munch args)
+                   (map (lambda (arg old-upper new-upper)
+                          (if (< old-upper new-upper)
+                              0
+                              arg))
+                        (drop args args-to-trim)
+                        old-uppers
+                        new-uppers))
+
+                 (let ((possible-result
+                        (specialized-array-share array
+                                                 new-domain
+                                                 (lambda args (apply values (munch args))))))
+                   (if (= (interval-volume (array-domain array))
+                          (interval-volume new-domain))
+                       possible-result
+                       (%%array-freeze! possible-result)))))
+              ((not (= (interval-volume new-domain)
+                       (interval-volume (array-domain array))))
+               (error "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: "
+                      array new-domain))
+              ((mutable-array? array)
+               (make-array new-domain
+                           (lambda multi-index
+                             (apply (array-getter array)
+                                    (drop multi-index args-to-trim)))
+                           (lambda (v . multi-index)
+                             (apply (array-setter array)
+                                    v
+                                    (drop multi-index args-to-trim)))))
+              (else
+               (make-array new-domain
+                           (lambda multi-index
+                             (apply (array-getter array)
+                                    (drop multi-index args-to-trim)))))))))
+
 (define (array-curry array right-dimension)
   (call-with-values
       (lambda ()

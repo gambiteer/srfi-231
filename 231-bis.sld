@@ -89,6 +89,7 @@
     array-reverse
     array-sample
     array-insert-axis
+    array-broadcast
     array-outer-product
     array-inner-product
     array-map

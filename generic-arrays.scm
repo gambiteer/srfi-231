@@ -3865,18 +3865,137 @@ OTHER DEALINGS IN THE SOFTWARE.
                                (%%getter-delete (%%array-unsafe-getter array) n k))))))
 
 (define (array-insert-axis array k #!optional (u_k 1))
-  (cond ((not (and (exact-integer? u_k) (positive? u_k)))
-         (error "array-insert-axis: The third argument is not a positive exact integer: " array k u_k))
-        ((and (< 1 u_k) (not (specialized-array? array)))
-         (error "array-insert-axis: The first argument is not a specialized array and the third argument is > 1: " array k u_k))
-        ((not (array? array))
+  (cond ((not (array? array))
          (error "array-insert-axis: The first argument is not an array: " array k))
         ((not (and (exact-integer? k)
                    (<= 0 k (%%array-dimension array))))
          (error "array-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): "
                 array k))
+        ((not (and (exact-integer? u_k) (positive? u_k)))
+         (error "array-insert-axis: The third argument is not a positive exact integer: " array k u_k))
+        ((and (< 1 u_k) (not (specialized-array? array)))
+         (error "array-insert-axis: The first argument is not a specialized array and the third argument is > 1: " array k u_k))
         (else
          (%%array-insert-axis array k u_k))))
+
+(define-macro (define-trimmers)
+
+  ;; Trim left indices from getter and setter args
+
+  (define (make-symbol . args)
+    (string->symbol
+     (apply string-append
+            (map (lambda (x)
+                   (cond ((string? x) x)
+                         ((symbol? x) (symbol->string x))
+                         ((number? x) (number->string x))))
+                 args))))
+  (define (i_ n)
+    (map (lambda (j)
+           (make-symbol 'i_ j))
+         (iota n)))
+
+  (define (generate-code-for-fixed-n name transformer n)
+    (let ((args (i_ n)))
+      `((,n)
+        (case k
+          ,@(map (lambda (k)
+                   `((,k)
+                     (lambda ,(transformer args)
+                       (,name ,@(transformer (drop args k))))))
+                 (iota n 1))))))
+
+  (define (trimmer name transformer)
+    `(define (,(make-symbol name '-trim) ,name n k)
+       (case n
+         ,@(map (lambda (n)
+                  (generate-code-for-fixed-n name transformer n))
+                (iota 4 1))
+         (else
+          (lambda ,(transformer 'multi-index)
+            (apply ,name ,@(transformer '((drop multi-index k)))))))))
+
+  (let ((result
+         `(begin
+            ,(trimmer '%%getter values)
+            ,(trimmer '%%setter (lambda (args) (cons 'v args))))))
+    #; (pp result)
+    result))
+
+(define-trimmers)
+
+(define (%%array-broadcast array new-domain)
+
+  ;; We're going to assume that a check has already been
+  ;; made so that new-domain is not the same as (array-domain array)
+  ;; and that array can be broadcast to new-domain
+
+  ;; And we're going to assume that if array is a generalized array
+  ;; then the number of elements in array and new-domain are the same.
+
+  (let* ((new-dimension (%%interval-dimension new-domain))
+         (args-to-trim (fx- new-dimension (%%array-dimension array))))
+    (cond ((specialized-array? array)
+
+           ;; For specialized arrays, we allow new-domain to have more
+           ;; elements than (array-domain array), so we have a more
+           ;; general transform of getters and setters
+
+           (let ((old-uppers
+                  (%%interval-upper-bounds->list (%%array-domain array)))
+                 (new-uppers
+                  (drop (%%interval-upper-bounds->list new-domain)
+                        args-to-trim)))
+
+             (define (munch args)
+               (map (lambda (arg old-upper new-upper)
+                      (if (< old-upper new-upper) 0 arg))
+                    (drop args args-to-trim)
+                    old-uppers
+                    new-uppers))
+
+             (let ((possible-result
+                    (%%specialized-array-share array
+                                               new-domain
+                                               (lambda args (apply values (munch args))))))
+               (if (fx= (%%interval-volume (%%array-domain array))
+                        (%%interval-volume new-domain))
+                   possible-result
+                   (%%array-freeze! possible-result)))))
+          ((mutable-array? array)
+           (make-array new-domain
+                       (%%getter-trim (%%array-unsafe-getter array)
+                                      new-dimension
+                                      args-to-trim)
+                       (%%setter-trim (%%array-unsafe-setter array)
+                                      new-dimension
+                                      args-to-trim)))
+          (else
+           (make-array new-domain
+                       (%%getter-trim (%%array-unsafe-getter array)
+                                      new-dimension
+                                      args-to-trim))))))
+
+(define (array-broadcast array new-domain)
+  (cond ((not (array? array))
+         (error "array-broadcast: The first argument is not an array: " array new-domain))
+        ((not (interval? new-domain))
+         (error "array-broadcast: The second argument is not an interval: " array new-domain))
+        ((%%interval= (%%array-domain array) new-domain)  ;; fast path
+         array)
+        ((not (let ((broadcast-domain
+                     (%%compute-broadcast-interval (list (%%array-domain array) new-domain))))
+                (and broadcast-domain
+                     (%%interval= broadcast-domain new-domain))))
+         (error "array-broadcast: The first argument cannot be broadcast to the second argument: "
+                array new-domain))
+        ((and (not (specialized-array? array))
+              (fx< (%%interval-volume (%%array-domain array))
+                   (%%interval-volume new-domain)))
+         (error "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: "
+                array new-domain))
+        (else
+         (%%array-broadcast array new-domain))))
 
 (define (%%array-outer-product combiner A B)
   (let* ((D_A            (%%array-domain A))
