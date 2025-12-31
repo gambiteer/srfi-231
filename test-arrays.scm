@@ -65,6 +65,7 @@ OTHER DEALINGS IN THE SOFTWARE.
     %%array-indexer
     %%array-getter
     %%array-packed?
+    %%array-freeze!
     %%specialized-array-share
     f16->double
     double->f16))
@@ -1204,6 +1205,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (object->array 'a 'a #t)
       "object->array: The second argument is not a storage class: ")
+
+(test (object->array 'a u1-storage-class)
+      "object->array: The first argument cannot be manipulated by the second argument (a storage class): ")
 
 (do ((i 0 (fx+ i 1)))
     ((fx= i random-tests))

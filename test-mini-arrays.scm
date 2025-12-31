@@ -1209,6 +1209,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test-error (object->array 'a 'a #t)
             "object->array: The second argument is not a storage class: ")
 
+(test-error (object->array 'a u1-storage-class)
+            "object->array: The first argument cannot be manipulated by the second argument (a storage class): ")
+
 (do ((i 0 (fx+ i 1)))
     ((fx= i random-tests))
 

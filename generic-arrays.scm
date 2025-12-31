@@ -2617,8 +2617,16 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "object->array: The third argument is not a boolean: " object storage-class mutable?))
         ((not (storage-class? storage-class))
          (error "object->array: The second argument is not a storage class: "  object storage-class))
+        ((not ((storage-class-checker storage-class) object))
+         (error "object->array: The first argument cannot be manipulated by the second argument (a storage class): "
+                object storage-class))
         (else
-         (%%list*->array 0 object storage-class mutable?))))
+         (%%finish-specialized-array %%zero-dimensional-interval
+                                     storage-class
+                                     ((storage-class-maker storage-class) 1 object)
+                                     (lambda () 0)
+                                     mutable?
+                                     #t))))  ;; new arrays are always in order
 
 (define (%%vector*->array dimension nested-vector storage-class mutable?)
 
