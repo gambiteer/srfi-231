@@ -71,6 +71,7 @@
     mutable-array?
     array-setter
     specialized-array-default-mutable?
+    array-broadcasting?
     array-empty?
     make-specialized-array
     make-specialized-array-from-data

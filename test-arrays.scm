@@ -2202,13 +2202,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                                   list) 1)
       "array-map: Not all arguments after the first are arrays: ")
 
-(test (array-map list
-                 (make-array (make-interval '#(3) '#(4))
-                             list)
-                 (make-array (make-interval '#(3 4) '#(4 5))
-                             list))
-      "array-map: Not all arrays have the same domain: ")
-
 (do ((d 0 (+ d 1)))
     ((= d 6))
   (let* ((A (make-array (make-interval (make-vector d 3)) list))
@@ -2239,13 +2232,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                    1)
       "array-every: Not all arguments after the first are arrays: ")
 
-(test (array-every list
-                   (make-array (make-interval '#(3) '#(4))
-                               list)
-                   (make-array (make-interval '#(3 4) '#(4 5))
-                               list))
-      "array-every: Not all arrays have the same domain: ")
-
 (test (array-any 1 2)
       "array-any: The first argument is not a procedure: ")
 
@@ -2257,13 +2243,6 @@ OTHER DEALINGS IN THE SOFTWARE.
                              list)
                  1)
       "array-any: Not all arguments after the first are arrays: ")
-
-(test (array-any list
-                 (make-array (make-interval '#(3) '#(4))
-                             list)
-                 (make-array (make-interval '#(3 4) '#(4 5))
-                             list))
-      "array-any: Not all arrays have the same domain: ")
 
 (pp "array-every and array-any")
 
@@ -2354,9 +2333,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (array-fold-left list 1 (make-array (make-interval '#()) list) 1)
       "array-fold-left: Not all arguments after the first two are arrays: ")
 
-(test (array-fold-left list 1 (make-array (make-interval '#()) list) (make-array (make-interval '#(1)) list))
-      "array-fold-left: Not all arrays have the same domain: ")
-
 (test (array-fold-left cons '() (make-array (make-interval '#()) (lambda () 42)))
       '(() . 42))
 
@@ -2371,9 +2347,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (array-fold-right list 1 (make-array (make-interval '#()) list) 1)
       "array-fold-right: Not all arguments after the first two are arrays: ")
-
-(test (array-fold-right list 1 (make-array (make-interval '#()) list) (make-array (make-interval '#(1)) list))
-      "array-fold-right: Not all arrays have the same domain: ")
 
 (test (array-fold-right cons '() (make-array (make-interval '#()) (lambda () 42)))
       '(42))
@@ -2393,13 +2366,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (array-for-each list (make-array (make-interval '#(3) '#(4))
                                        list) 1)
       "array-for-each: Not all arguments after the first are arrays: ")
-
-(test (array-for-each list
-                      (make-array (make-interval '#(3) '#(4))
-                                  list)
-                      (make-array (make-interval '#(3 4) '#(4 5))
-                                  list))
-      "array-for-each: Not all arrays have the same domain: ")
 
 (pp "array-map, array-fold-right, and array-for-each result tests")
 
@@ -3885,6 +3851,87 @@ OTHER DEALINGS IN THE SOFTWARE.
                 "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: ")))))
 
 (next-test-random-source-state!)
+
+(pp "Simple implicit broadcast argument tests")
+
+(let* ((specialized-2x2
+        (list*->array 2 '((1 2)
+                          (4 8))))
+       (specialized-2x3
+        (list*->array 2 '((1  2  4)
+                          (8 16 32))))
+       (specialized-1x2x2
+        (list*->array 3 '(((10 20)
+                           (40 80)))))
+       (specialized-2x1x2
+        (list*->array 3 '(((100 200))
+                          ((400 800)))))
+       (generalized-2x2
+        (make-array (array-domain specialized-2x2)
+                    (array-getter specialized-2x2))))
+  (parameterize
+      ((array-broadcasting? #t))
+    (for-each (lambda (array-proc list-proc caller)
+                (for-each (lambda (arrays)
+                            (let* ((common-domain
+                                    (apply compute-broadcast-interval (map array-domain arrays)))
+                                   (lists
+                                    (map (lambda (A)
+                                           (array->list (array-broadcast A common-domain)))
+                                         arrays)))
+                              (test (apply array-proc + arrays)
+                                    (apply list-proc  + lists))))
+                          (list (list specialized-2x2 specialized-1x2x2)
+                                (list generalized-2x2 specialized-1x2x2)
+                                (list specialized-2x2 specialized-2x1x2)))
+                (test (array-proc + generalized-2x2 specialized-2x1x2)
+                      (string-append caller "Generalized array cannot be broadcast to a domain with more elements: "))
+                (test (array-proc + specialized-2x2 specialized-2x3)
+                      (string-append caller "Arrays cannot be broadcast to a common domain: ")))
+              (list array-for-each
+                    array-every
+                    array-any
+                    (lambda (op . arrays) (array->list (apply array-map op arrays)))
+                    (lambda (op . arrays) (apply array-fold-left op 0 arrays))
+                    (lambda (op . arrays) (apply array-fold-right op 0 arrays)))
+              (list for-each
+                    every
+                    any
+                    (lambda (op . lists) (apply map op lists))
+                    (lambda (op . lists) (apply fold op 0 lists))
+                    (lambda (op . lists) (apply fold-right op 0 lists)))
+              (list "array-for-each: "
+                    "array-every: "
+                    "array-any: "
+                    "array-map: "
+                    "array-fold-left: "
+                    "array-fold-right: ")) )
+  (parameterize
+      ((array-broadcasting? #f))
+    (for-each (lambda (array-proc caller)
+                (for-each (lambda (arrays)
+                            (test
+                             (apply array-proc + arrays)
+                             (string-append
+                              caller
+                              "The parameter array-broadcasting? is #f and the domains of the array arguments are not the same: ")))
+                          (list (list specialized-2x2 specialized-1x2x2)
+                                (list generalized-2x2 specialized-1x2x2)
+                                (list specialized-2x2 specialized-2x1x2)
+                                (list generalized-2x2 specialized-2x1x2)
+                                (list specialized-2x2 specialized-2x3))))
+              (list array-for-each
+                    array-every
+                    array-any
+                    (lambda (op . arrays) (array->list (apply array-map op arrays)))
+                    (lambda (op . arrays) (apply array-fold-left op 0 arrays))
+                    (lambda (op . arrays) (apply array-fold-right op 0 arrays)))
+              (list "array-for-each: "
+                    "array-every: "
+                    "array-any: "
+                    "array-map: "
+                    "array-fold-left: "
+                    "array-fold-right: "))))
 
 (pp "compute-broadcast-interval tests")
 

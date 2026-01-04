@@ -326,6 +326,14 @@
          bool
          (error "specialized-array-default-mutable?: The argument is not a boolean: " bool)))))
 
+(define array-broadcasting?
+  (make-parameter
+   #t
+   (lambda (bool)
+     (if (boolean? bool)
+         bool
+         (error "array-broadcasting?: The argument is not a boolean: " bool)))))
+
 (define make-array
   (case-lambda
    ((domain getter)
@@ -1513,6 +1521,40 @@
              (make-array new-domain
                          (getter-delete (array-getter array) k))))))))
 
+(define (%%broadcast-array-arguments arrays caller)
+  ;; assumes that arrays is a non-null list of arrays
+  (let ((domains (map array-domain arrays)))
+    (if (every (lambda (I)
+                 (interval= I (car domains)))
+               (cdr domains))
+        ;; fast path
+        arrays
+        (if (array-broadcasting?)
+            (let ((broadcast-domain
+                   (apply compute-broadcast-interval domains)))
+              (if broadcast-domain
+                  (map (lambda (A)
+                         (cond ((interval= (array-domain A)
+                                             broadcast-domain)
+                                A)
+                               ((or (specialized-array? A)
+                                    (= (interval-volume (array-domain A))
+                                       (interval-volume broadcast-domain)))
+                                (array-broadcast A broadcast-domain))
+                               (else
+                                (error (string-append
+                                        caller
+                                        "Generalized array cannot be broadcast to a domain with more elements: ")
+                                       A broadcast-domain))))
+                       arrays)
+                  (apply error (string-append caller "Arrays cannot be broadcast to a common domain: ") arrays)))
+            (apply
+             error
+             (string-append
+              caller
+              "The parameter array-broadcasting? is #f and the domains of the array arguments are not the same: ")
+             arrays)))))
+
 (define (array-broadcast array new-domain)
   (if (interval= (array-domain array) new-domain)
       array
@@ -1599,12 +1641,16 @@
       (apply f (map (lambda (g) (apply g multi-index)) getters)))))
 
 (define (array-map f array . arrays)
-  (make-array (array-domain array)
-              (%%specialize-function-applied-to-array-getters f (cons array arrays))))
+  (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-map: ")))
+    (make-array
+     (array-domain (car arrays))
+     (%%specialize-function-applied-to-array-getters f arrays))))
 
 (define (array-for-each f array . arrays)
-  (interval-for-each (%%specialize-function-applied-to-array-getters f (cons array arrays))
-                     (array-domain array)))
+  (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-for-each: ")))
+    (interval-for-each
+     (%%specialize-function-applied-to-array-getters f arrays)
+     (array-domain (car arrays)))))
 
 (define (%%interval-every f interval)
   (or (eqv? (interval-volume interval) 0)
@@ -1635,28 +1681,32 @@
                         (- index 1))))))))
 
 (define (array-every f array . arrays)
-  (%%interval-every (%%specialize-function-applied-to-array-getters f (cons array arrays))
-                    (array-domain array)))
+  (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-every: ")))
+    (%%interval-every
+     (%%specialize-function-applied-to-array-getters f arrays)
+     (array-domain (car arrays)))))
 
 (define (array-any f array . arrays)
-  (%%interval-any (%%specialize-function-applied-to-array-getters f (cons array arrays))
-                  (array-domain array)))
+  (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-any: ")))
+    (%%interval-any
+     (%%specialize-function-applied-to-array-getters f arrays)
+     (array-domain (car arrays)))))
 
 (define (array-fold-left op left-id array . arrays)
-  (apply interval-fold-left
-         op
-         left-id
-         (array-domain array)
-         (array-getter array)
-         (map array-getter arrays)))
+  (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-fold-left: ")))
+    (apply interval-fold-left
+           op
+           left-id
+           (array-domain (car arrays))
+           (map array-getter arrays))))
 
 (define (array-fold-right op right-id array . arrays)
-  (apply interval-fold-right
-         op
-         right-id
-         (array-domain array)
-         (array-getter array)
-         (map array-getter arrays)))
+  (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-fold-right: ")))
+    (apply interval-fold-right
+           op
+           right-id
+           (array-domain (car arrays))
+           (map array-getter arrays))))
 
 (define array-reduce
   (let ((%%array-reduce-base (list 'base)))

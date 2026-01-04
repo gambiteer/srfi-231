@@ -1144,6 +1144,14 @@ OTHER DEALINGS IN THE SOFTWARE.
          bool
          (error "specialized-array-default-mutable?: The argument is not a boolean: " bool)))))
 
+(define array-broadcasting?
+  (make-parameter
+   #t
+   (lambda (bool)
+     (if (boolean? bool)
+         bool
+         (error "array-broadcasting?: The argument is not a boolean: " bool)))))
+
 ;; An array has a domain (which is an interval) and an getter that maps that domain into some type of
 ;; Scheme objects
 
@@ -3886,6 +3894,40 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%array-insert-axis array k u_k))))
 
+(define (%%broadcast-array-arguments arrays caller)
+  ;; assumes that arrays is a non-null list of arrays
+  (let ((domains (map %%array-domain arrays)))
+    (if (every (lambda (I)
+                 (%%interval= I (car domains)))
+               (cdr domains))
+        ;; fast path
+        arrays
+        (if (array-broadcasting?)
+            (let ((broadcast-domain
+                   (%%compute-broadcast-interval domains)))
+              (if broadcast-domain
+                  (map (lambda (A)
+                         (cond ((%%interval= (%%array-domain A)
+                                             broadcast-domain)
+                                A)
+                               ((or (specialized-array? A)
+                                    (= (%%interval-volume (%%array-domain A))
+                                       (%%interval-volume broadcast-domain)))
+                                (%%array-broadcast A broadcast-domain))
+                               (else
+                                (error (string-append
+                                        caller
+                                        "Generalized array cannot be broadcast to a domain with more elements: ")
+                                       A broadcast-domain))))
+                       arrays)
+                  (apply error (string-append caller "Arrays cannot be broadcast to a common domain: ") arrays)))
+            (apply
+             error
+             (string-append
+              caller
+              "The parameter array-broadcasting? is #f and the domains of the array arguments are not the same: ")
+             arrays)))))
+
 (define-macro (define-trimmers)
 
   ;; Trim left indices from getter and setter args
@@ -4369,12 +4411,8 @@ OTHER DEALINGS IN THE SOFTWARE.
            (apply error "array-map: The first argument is not a procedure: " f arrays))
           ((not (every array? arrays))
            (apply error "array-map: Not all arguments after the first are arrays: " f arrays))
-          ((not (every (lambda (A) (%%interval= (%%array-domain A)
-                                                (%%array-domain array)))
-                       (cdr arrays)))
-           (apply error "array-map: Not all arrays have the same domain: " f arrays))
           (else
-           (%%array-map f arrays)))))
+           (%%array-map f (%%broadcast-array-arguments arrays "array-map: "))))))
 
 ;;; applies f to the elements of the arrays in lexicographical order.
 
@@ -4440,12 +4478,8 @@ OTHER DEALINGS IN THE SOFTWARE.
            (apply error "array-for-each: The first argument is not a procedure: " f arrays))
           ((not (every array? arrays))
            (apply error "array-for-each: Not all arguments after the first are arrays: " f arrays))
-          ((not (every (lambda (A) (%%interval= (%%array-domain A)
-                                                (%%array-domain array)))
-                       (cdr arrays)))
-           (apply error "array-for-each: Not all arrays have the same domain: " f arrays))
           (else
-           (%%array-for-each f arrays)))))
+           (%%array-for-each f (%%broadcast-array-arguments arrays "array-for-each: "))))))
 
 (define-macro (macro-make-predicates)
 
@@ -4540,13 +4574,8 @@ OTHER DEALINGS IN THE SOFTWARE.
            (apply error "array-every: The first argument is not a procedure: " f arrays))
           ((not (every array? arrays))
            (apply error "array-every: Not all arguments after the first are arrays: " f arrays))
-          ((not (every (lambda (A)
-                         (%%interval= (%%array-domain A)
-                                      (%%array-domain array)))
-                       (cdr arrays)))
-           (apply error "array-every: Not all arrays have the same domain: " f arrays))
           (else
-           (%%array-every f arrays)))))
+           (%%array-every f (%%broadcast-array-arguments arrays "array-every: "))))))
 
 (define (%%array-any f arrays)
   (%%interval-any (%%specialize-function-applied-to-array-getters f arrays)
@@ -4558,13 +4587,8 @@ OTHER DEALINGS IN THE SOFTWARE.
            (apply error "array-any: The first argument is not a procedure: " f arrays))
           ((not (every array? arrays))
            (apply error "array-any: Not all arguments after the first are arrays: " f arrays))
-          ((not (every (lambda (A)
-                         (%%interval= (%%array-domain A)
-                                      (%%array-domain array)))
-                       (cdr arrays)))
-           (apply error "array-any: Not all arrays have the same domain: " f arrays))
           (else
-           (%%array-any f arrays)))))
+           (%%array-any f (%%broadcast-array-arguments arrays "array-any: "))))))
 
 (define (%%array-fold-left op id arrays)
 
@@ -4622,13 +4646,8 @@ OTHER DEALINGS IN THE SOFTWARE.
            (apply error "array-fold-left: The first argument is not a procedure: " op id arrays))
           ((not (every array? arrays))
            (apply error "array-fold-left: Not all arguments after the first two are arrays: " op id arrays))
-          ((not (every (lambda (a)
-                         (%%interval= (%%array-domain a)
-                                      (%%array-domain array)))
-                       (cdr arrays)))
-           (apply error "array-fold-left: Not all arrays have the same domain: " op id arrays))
           (else
-           (%%array-fold-left op id arrays)))))
+           (%%array-fold-left op id (%%broadcast-array-arguments arrays "array-fold-left: "))))))
 
 (define (array-fold-right op id array . arrays)
   (let ((arrays (cons array arrays)))
@@ -4636,13 +4655,8 @@ OTHER DEALINGS IN THE SOFTWARE.
            (apply error "array-fold-right: The first argument is not a procedure: " op id arrays))
           ((not (every array? arrays))
            (apply error "array-fold-right: Not all arguments after the first two are arrays: " op id arrays))
-          ((not (every (lambda (a)
-                         (%%interval= (%%array-domain a)
-                                      (%%array-domain array)))
-                       arrays))
-           (apply error "array-fold-right: Not all arrays have the same domain: " op id array arrays))
           (else
-           (%%array-fold-right op id arrays)))))
+           (%%array-fold-right op id (%%broadcast-array-arguments arrays "array-fold-right: "))))))
 
 (define (%%array-fold-right op id arrays)
 
