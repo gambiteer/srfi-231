@@ -2,6 +2,9 @@
 
 (define SRFI "231-bis") ;; must be a string
 
+(define (<cv> . args)
+  (<code>(apply <var> args)))
+
 (define (format-lambda-list lst #!optional id)
   (let ((name (car lst))
         (arguments (cdr lst)))
@@ -3086,6 +3089,11 @@ A after assignment:
          (list*->array 2 '((14)))
          (list*->array 2 '((15 16 17))))))) ;; this array
 => error"))
+(<p> (<b> "Example: Kronecker product: ")" If you have two nonempty arrays "(<cv>'A)" and "(<cv>'B)" of the same dimension with numbers as elements, then the "(<a> href: "https://en.wikipedia.org/wiki/Kronecker_product" "Kronecker product")" of "(<cv>'A)" and "(<cv>'B)" can be computed as")
+(<pre>(<code>"(define (Kronecker-product A B)
+  (array-block
+   (array-map (lambda (a) (array-map (lambda (b) (* a b)) B)) A)))"))
+(<p> "Iterated Kronecker products can be used to product "(<a> href: "https://rosettacode.org/wiki/Kronecker_product_based_fractals?oldid=390075#Scheme" "fractal patterns")".")
 
 (format-lambda-list '(array-ref array #\. multi-index))
 (<p> "Assumes that "(<code>(<var>'array))" is an array, and  "(<code>(<var>'multi-index))" is a sequence of exact integers.")

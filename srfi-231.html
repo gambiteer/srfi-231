@@ -2633,6 +2633,11 @@ A after assignment:
          (list*-&gt;array 2 '((14)))
          (list*-&gt;array 2 '((15 16 17))))))) ;; this array
 =&gt; error</code></pre>
+    <p><b>Example: Kronecker product: </b> If you have two nonempty arrays <code><var>A</var></code> and <code><var>B</var></code> of the same dimension with numbers as elements, then the <a href="https://en.wikipedia.org/wiki/Kronecker_product">Kronecker product</a> of <code><var>A</var></code> and <code><var>B</var></code> can be computed as</p>
+    <pre><code>(define (Kronecker-product A B)
+  (array-block
+   (array-map (lambda (a) (array-map (lambda (b) (* a b)) B)) A)))</code></pre>
+    <p>Iterated Kronecker products can be used to product <a href="https://rosettacode.org/wiki/Kronecker_product_based_fractals?oldid=390075#Scheme">fractal patterns</a>.</p>
     <p><b>Procedure: </b><code><a id="array-ref">array-ref</a> <var>array</var> . <var>multi-index</var></code></p>
     <p>Assumes that <code><var>array</var></code> is an array, and  <code><var>multi-index</var></code> is a sequence of exact integers.</p>
     <p>Returns <code>(apply (array-getter <var>array</var>) <var>multi-index</var>)</code>.</p>
