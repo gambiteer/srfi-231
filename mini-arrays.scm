@@ -1719,12 +1719,23 @@
                           (array-domain A)
                           (array-getter A)))))
 
-(define (array-inner-product A f g B)
-  (array-outer-product
-   (lambda (a b)
-     (array-reduce f (array-map g a b)))
-   (array-copy (array-curry A 1))
-   (array-copy (array-curry (array-permute B (index-rotate (array-dimension B) 1)) 1))))
+(define array-inner-product
+  (case-lambda
+   ((A f g B)
+    (array-inner-product A f g B generic-storage-class (specialized-array-default-mutable?)))
+   ((A f g B storage-class)
+    (array-inner-product A f g B storage-class (specialized-array-default-mutable?)))
+   ((A f g B storage-class mutable?)
+    (array-copy
+     (array-outer-product
+      (lambda (a b)
+        (array-reduce f (array-map g a b)))
+      (array-curry (%%->specialized-array A generic-storage-class) 1)
+      (array-curry (%%->specialized-array (array-permute B (index-last (array-dimension B) 0))
+                                          generic-storage-class)
+                   1))
+     storage-class
+     mutable?))))
 
 (define (array-outer-product combiner A B)
   (let* ((D_A            (array-domain A))

@@ -4708,7 +4708,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (next-test-random-source-state!)
 
-(let ((test-array (make-array  (make-interval '#(0) '#(1)) list)))
+(let ((test-array (make-array (make-interval '#(0) '#(1)) list)))
 
   (test (array-outer-product 'a test-array test-array)
         "array-outer-product: The first argument is not a procedure: ")
@@ -4741,10 +4741,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (do ((i 0 (+ i 1)))
     ((= i random-tests))
-  (let* ((arrays
-          (map (lambda (ignore)
-                 (make-array (random-interval 0 6) list))
-               (make-list 2))))
+  (let ((arrays
+         (map (lambda (ignore)
+                (make-array (random-interval 0 6) list))
+              (make-list 2))))
     (test (myarray= (apply array-outer-product append arrays)
                     (make-array (apply my-interval-cartesian-product (map array-domain arrays))
                                 list))
@@ -5747,7 +5747,7 @@ that computes the componentwise products when we need them, the times are
                  (array-curry B 1)
                  (array-curry C 1)))
 
-(pp "cursory array-inner-product tests")
+(pp "array-inner-product tests")
 
 (test (array-inner-product 'a 'a 'a 'a)
       "array-inner-product: The first argument is not an array: ")
@@ -5782,6 +5782,38 @@ that computes the componentwise products when we need them, the times are
                            (make-array (make-interval '#()) list))
       "array-inner-product: The fourth argument has dimension zero: ")
 
+(test (array-inner-product (make-array (make-interval '#(4)) values)
+                           + *
+                           (make-array (make-interval '#(4)) values)
+                           'a)
+      "array-inner-product: The fifth argument is not a storage class: ")
+
+(test (array-inner-product (make-array (make-interval '#(4)) values)
+                           + *
+                           (make-array (make-interval '#(4)) values)
+                           u1-storage-class
+                           'a)
+      "array-inner-product: The sixth argument is not a boolean: ")
+
+(test (array-inner-product (make-array (make-interval '#(4)) values)
+                           + *
+                           (make-array (make-interval '#(4)) values)
+                           u1-storage-class)
+      "array-inner-product: Not all elements of the source can be stored in destination: ")
+
+(test (specialized-array? (array-inner-product (make-array (make-interval '#(4)) values)
+                                               + *
+                                               (make-array (make-interval '#(4)) values)))
+      #t)
+
+(for-each (lambda (mutable?)
+            (test (mutable-array? (parameterize ((specialized-array-default-mutable? mutable?))
+                                    (array-inner-product (make-array (make-interval '#(4)) values)
+                                                         + *
+                                                         (make-array (make-interval '#(4)) values))))
+                  mutable?))
+          '(#t #f))
+
 (let* ((A (make-array (make-interval '#(0 4)) list))
        (B (make-array (make-interval '#(4 0)) list))
        (C (array-inner-product A list list B))) ;; should be no error, you can take outer product of empty arrays
@@ -5792,6 +5824,38 @@ that computes the componentwise products when we need them, the times are
        (B (make-array (make-interval '#(0 4)) list)))
   (test (array-inner-product A list list B)
         "array-inner-product: The width of the first axis of the fourth argument is zero: "))
+
+(define (my-array-inner-product A f g B)
+  (array-copy
+   (array-outer-product (lambda (a b)
+                          (array-reduce f (array-map g a b)))
+                        (array-curry (array-copy A) 1)
+                        (array-curry (array-copy (array-permute B (index-last (array-dimension B) 0))) 1))))
+
+(do ((i 0 (fx+ i 1)))
+    ((fx= i random-tests))
+  (let* ((A-domain-stub
+          (random-nonempty-interval 0 5))
+         (B-domain-stub
+          (random-nonempty-interval 0 (random 1 (- 6 (interval-dimension A-domain-stub)))))
+         (one-dimensional-interval
+          (make-interval '#(3)))
+         (A_D
+          (interval-cartesian-product A-domain-stub one-dimensional-interval))
+         (B_D
+          (interval-cartesian-product one-dimensional-interval B-domain-stub))
+         (A
+          (array-copy (make-array A_D (lambda args (random 10)))))
+         (B
+          (array-copy (make-array B_D (lambda args (random 10))))))
+    (test (eq? (array-storage-class (array-inner-product A + * B s64-storage-class))
+               s64-storage-class)
+          #t)
+    (test (myarray= (array-inner-product A + * B)
+                    (my-array-inner-product A + * B))
+          #t)))
+
+(next-test-random-source-state!)
 
 (pp "array-append and array-append! tests")
 

@@ -1,7 +1,7 @@
 #|
 SRFI 231: Intervals and Generalized Arrays
 
-Copyright 2016, 2018, 2020, 2021, 2022 Bradley J Lucier.
+Copyright 2016, 2018, 2020, 2021, 2022, 2023, 2024, 2025, 2026 Bradley J Lucier.
 All Rights Reserved.
 
 Permission is hereby granted, free of charge,
@@ -4047,8 +4047,10 @@ OTHER DEALINGS IN THE SOFTWARE.
         (else
          (%%array-broadcast array new-domain))))
 
-(define (%%array-outer-product combiner A B)
-  (let* ((D_A            (%%array-domain A))
+(define (%%array-outer-product combiner A B caller)
+  (let* ((A              (%%->specialized-array A generic-storage-class caller))
+         (B              (%%->specialized-array B generic-storage-class caller))
+         (D_A            (%%array-domain A))
          (D_B            (%%array-domain B))
          (A_             (%%array-unsafe-getter A))
          (B_             (%%array-unsafe-getter B))
@@ -4141,7 +4143,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (procedure? combiner))
          (error "array-outer-product: The first argument is not a procedure: " combiner array1 array2))
         (else
-         (%%array-outer-product combiner array1 array2))))
+         (%%array-outer-product combiner array1 array2 "array-outer-product: "))))
 
 (define (%%immutable-array-curry array right-dimension)
   (call-with-values
@@ -4947,15 +4949,54 @@ OTHER DEALINGS IN THE SOFTWARE.
                                 "array-assign!: ")
          (void))))
 
-(define (%%array-inner-product A f g B)
-  ;; Copy the curried arrays for efficiency.
-  (%%array-outer-product
-   (lambda (a b)
-     (%%array-reduce f (%%array-map g (list a b))))
-   (array-copy (%%array-curry A 1))
-   (array-copy (%%array-curry (%%array-permute B (%%index-rotate (%%array-dimension B) 1)) 1))))
+(define (%%array-inner-product A
+                               f g
+                               B
+                               storage-class
+                               mutable?
+                               caller)
+  (let* ((A
+          (%%->specialized-array
+           A
+           generic-storage-class
+           caller))
+         (rotated-B
+          (%%->specialized-array
+           (%%array-permute B (%%index-last (%%array-dimension B) 0))
+           generic-storage-class
+           caller))
+         (reduce-start
+          (%%interval-lower-bound (%%array-domain B) 0))
+         (reduce-count
+          (%%interval-width (%%array-domain B) 0)))
+    (%!array-copy
+     (%%array-outer-product
+      (lambda (a b)
+        (let ((index reduce-start)
+              (a_    (%%array-unsafe-getter a))
+              (b_    (%%array-unsafe-getter b)))
+          (let loop ((sum (g (a_ index) (b_ index)))
+                     (iterations-left (fx- reduce-count 1))
+                     (index (fx+ index 1)))
+            (if (eqv? iterations-left 0)
+                sum
+                (loop (f sum (g (a_ index) (b_ index)))
+                      (fx- iterations-left 1)
+                      (fx+ index 1))))))
+      (%%array-curry A 1)
+      (%%array-curry rotated-B 1)
+      caller)
+     storage-class
+     mutable?
+     caller
+     #f)))  ;; call-cc/safe?
 
-(define (array-inner-product A f g B)
+(define (array-inner-product A
+                             f g
+                             B
+                             #!optional
+                             (storage-class generic-storage-class)
+                             (mutable?      (specialized-array-default-mutable?)))
   (cond ((not (array? A))
          (error "array-inner-product: The first argument is not an array: " A f g B))
         ((not (procedure? f))
@@ -4981,8 +5022,12 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((eqv? (%%interval-width (%%array-domain B) 0) 0)
          (error "array-inner-product: The width of the first axis of the fourth argument is zero: "
                 A f g B))
+        ((not (storage-class? storage-class))
+         (error "array-inner-product: The fifth argument is not a storage class: " A f g B storage-class))
+        ((not (boolean? mutable?))
+         (error "array-inner-product: The sixth argument is not a boolean: " A f g B storage-class mutable?))
         (else
-         (%%array-inner-product A f g B))))
+         (%%array-inner-product A f g B storage-class mutable? "array-inner-product: "))))
 
 ;;; Refactored from array-stack
 
