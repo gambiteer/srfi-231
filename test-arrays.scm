@@ -660,6 +660,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (interval-fold-left values 3 (make-interval '#(2 2)) 2)
       "interval-fold-left: Not all arguments after the third are procedures: ")
 
+(test (interval-fold-left values 3 (make-interval '#(2 2)) + 2)
+      "interval-fold-left: Not all arguments after the third are procedures: ")
+
 (test (interval-fold-right 1 2 3 4)
       "interval-fold-right: The third argument is not an interval: ")
 
@@ -669,7 +672,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (interval-fold-right values 3 (make-interval '#(2 2)) 1)
       "interval-fold-right: Not all arguments after the third are procedures: ")
 
-;;; We'll mainly rely on tests for array-fold[lr] to test interval-fold[lr]
+(test (interval-fold-right values 3 (make-interval '#(2 2)) + 1)
+      "interval-fold-right: Not all arguments after the third are procedures: ")
+
+;;; We'll mainly rely on tests for array-fold-{left|right} to test interval-fold-{left|right}
 
 (test (interval-fold-left + 0 (make-interval '#(5)) identity)
       10)
@@ -2577,13 +2583,13 @@ OTHER DEALINGS IN THE SOFTWARE.
       "array-curry: The first argument is not an array: ")
 
 (test (array-curry (make-array (make-interval '#(0) '#(1)) list)  'a)
-      "array-curry: The second argument is not an exact integer between 0 and (interval-dimension (array-domain array)) (inclusive): ")
+      "array-curry: The second argument is not an exact integer between 0 and (array-dimension array) (inclusive): ")
 
 (test (array-curry (make-array (make-interval '#(0 0) '#(1 1)) list)  -1)
-      "array-curry: The second argument is not an exact integer between 0 and (interval-dimension (array-domain array)) (inclusive): ")
+      "array-curry: The second argument is not an exact integer between 0 and (array-dimension array) (inclusive): ")
 
 (test (array-curry (make-array (make-interval '#(0 0) '#(1 1)) list)  3)
-      "array-curry: The second argument is not an exact integer between 0 and (interval-dimension (array-domain array)) (inclusive): ")
+      "array-curry: The second argument is not an exact integer between 0 and (array-dimension array) (inclusive): ")
 
 ;;; Used to fail.
 

@@ -1250,7 +1250,7 @@ indexer:       (lambda multi-index
     <p>for all multi-indices <code>i j k l</code> in <code>interval</code>.</p>
     <p>The subarrays are immutable, mutable, or specialized according to whether the array argument is immutable, mutable, or specialized.</p>
     <p>More precisely, if </p>
-    <pre><code>0 &lt;= <var>inner-dimension</var> &lt;= (interval-dimension (array-domain <var>array</var>))</code></pre>
+    <pre><code>0 &lt;= <var>inner-dimension</var> &lt;= (array-dimension <var>array</var>)</code></pre>
     <p>then <code>array-curry</code> returns a result as follows.</p>
     <p>If the input array is specialized, then array-curry returns</p>
     <pre><code>(call-with-values

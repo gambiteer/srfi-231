@@ -716,7 +716,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (interval? interval))
          (error "interval-insert-axis: The first argument is not an interval: " interval k))
         ((not (and (exact-integer? k)
-                   (<= 0 k (interval-dimension interval))))
+                   (<= 0 k (%%interval-dimension interval))))
          (error "interval-insert-axis: The second argument is not an exact integer between 0 (inclusive) and the dimension of the first argument (inclusive): "
                 interval k))
         (else
@@ -914,14 +914,15 @@ OTHER DEALINGS IN THE SOFTWARE.
       (generate-code)))
 
 (define (interval-fold-left operator identity interval f . fs)
-  (cond ((not (interval? interval))
-         (apply error "interval-fold-left: The third argument is not an interval: " operator identity interval f fs))
-        ((not (procedure? operator))
-         (apply error "interval-fold-left: The first argument is not a procedure: " operator identity interval f fs))
-        ((not (procedure? f))
-         (apply error "interval-fold-left: Not all arguments after the third are procedures: " operator identity interval f fs))
-        (else
-         (%%interval-fold-left operator identity interval (cons f fs)))))
+  (let ((fs (cons f fs)))
+    (cond ((not (interval? interval))
+           (apply error "interval-fold-left: The third argument is not an interval: " operator identity interval fs))
+          ((not (procedure? operator))
+           (apply error "interval-fold-left: The first argument is not a procedure: " operator identity interval fs))
+          ((not (every procedure? fs))
+           (apply error "interval-fold-left: Not all arguments after the third are procedures: " operator identity interval fs))
+          (else
+           (%%interval-fold-left operator identity interval fs)))))
 
 (define (%%interval-fold-left operator identity interval fs)
 
@@ -1028,14 +1029,15 @@ OTHER DEALINGS IN THE SOFTWARE.
       (generate-code)))
 
 (define (interval-fold-right operator identity interval f . fs)
-  (cond ((not (interval? interval))
-         (apply error "interval-fold-right: The third argument is not an interval: " operator identity interval f fs))
-        ((not (procedure? operator))
-         (apply error "interval-fold-right: The first argument is not a procedure: " operator identity interval f fs))
-        ((not (every procedure? (cons f fs)))
-         (apply error "interval-fold-right: Not all arguments after the third are procedures: " operator identity interval f fs))
-        (else
-         (%%interval-fold-right operator identity interval (cons f fs)))))
+  (let ((fs (cons f fs)))
+    (cond ((not (interval? interval))
+           (apply error "interval-fold-right: The third argument is not an interval: " operator identity interval fs))
+          ((not (procedure? operator))
+           (apply error "interval-fold-right: The first argument is not a procedure: " operator identity interval fs))
+          ((not (every procedure? fs))
+           (apply error "interval-fold-right: Not all arguments after the third are procedures: " operator identity interval fs))
+          (else
+           (%%interval-fold-right operator identity interval fs)))))
 
 (define (%%interval-fold-right operator identity interval fs)
 
@@ -2917,7 +2919,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                      (assq source-storage-class %%storage-class-compatibility-alist)))
                                 (and compatibility-list
                                      (memq destination-storage-class compatibility-list)))))))))
-         ;; either no checks are possible (not a specialized array), or no checks are needed
+         ;; either no checks are possible (destination not a specialized array), or no checks are needed
          (let ((common-domain (%%array-domain source))
                (unsafe-getter (%%array-unsafe-getter source))
                (unsafe-setter (%%array-unsafe-setter destination)))
@@ -4327,7 +4329,7 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "array-curry: The first argument is not an array: " array right-dimension))
         ((not (and (fixnum? right-dimension)
                    (fx<= 0 right-dimension (%%array-dimension array))))
-         (error "array-curry: The second argument is not an exact integer between 0 and (interval-dimension (array-domain array)) (inclusive): " array right-dimension))
+         (error "array-curry: The second argument is not an exact integer between 0 and (array-dimension array) (inclusive): " array right-dimension))
         (else
          (%%array-curry array right-dimension))))
 

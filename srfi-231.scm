@@ -1587,7 +1587,7 @@ of whose elements is itself an (immutable) array and ")
 (<p> "The subarrays are immutable, mutable, or specialized according to whether the array argument is immutable, mutable, or specialized.")
 (<p> "More precisely, if ")
 (<pre>
- (<code> "0 <= "(<var> 'inner-dimension)" <= (interval-dimension (array-domain "(<var> 'array)"))"))
+ (<code> "0 <= "(<var> 'inner-dimension)" <= (array-dimension "(<var> 'array)")"))
 (<p> "then "(<code> 'array-curry)" returns a result as follows.")
 (<p> "If the input array is specialized, then array-curry returns")
 (<pre>

@@ -1100,7 +1100,7 @@
 (define (array->list* array)
 
   (define (a->l a)
-    (let ((dim (interval-dimension (array-domain a))))
+    (let ((dim (array-dimension a)))
       (case dim
         ((0) ((array-getter a)))
         ((1) (array->list a))
@@ -1174,7 +1174,7 @@
 (define (array->vector* array)
 
   (define (a->v a)
-    (let ((dim (interval-dimension (array-domain a))))
+    (let ((dim (array-dimension a)))
       (case dim
         ((0) ((array-getter a)))
         ((1) (array->vector a))
