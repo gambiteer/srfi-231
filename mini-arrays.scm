@@ -1738,7 +1738,9 @@
      mutable?))))
 
 (define (array-outer-product combiner A B)
-  (let* ((D_A            (array-domain A))
+  (let* ((A              (%%->specialized-array A generic-storage-class))
+         (B              (%%->specialized-array B generic-storage-class))
+         (D_A            (array-domain A))
          (D_B            (array-domain B))
          (A_             (array-getter A))
          (B_             (array-getter B))
