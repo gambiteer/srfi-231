@@ -780,7 +780,6 @@ $[l_0,u_0)\\times [l_1,u_1)\\times\\cdots\\times[l_{d-1},u_{d-1})$\n"
       (interval= (make-interval '#(2 3 1)) left)    ;; => #t
       (interval= (make-interval '#(5 4)) right))))  ;; => #t"))
 
-
         (format-lambda-list '(interval-for-each f interval))
         (<p> "This procedure assumes that "(<code>(<var> 'interval))" is an interval and "(<code>(<var> 'f))" is a procedure whose domain includes elements of "(<code>(<var> 'interval))".  It is an error to call "(<code> 'interval-for-each)" if "(<code>(<var> 'interval))" and "(<code>(<var> 'f))" do not satisfy these conditions.")
         (<p>  (<code> 'interval-for-each)" calls "(<code>(<var> 'f))" with each multi-index of "(<code>(<var> 'interval))" as arguments, all in lexicographical order.")
@@ -1174,7 +1173,6 @@ do not satisfy these conditions.")
 (<p> "Then "(<code> 'make-array)" builds a mutable array with domain "(<code>(<var> 'interval))", getter "(<code>(<var> 'getter))", and
 setter "(<code>(<var> 'setter))".  It is an error to call "(<code> 'make-array)" if its arguments do not satisfy these conditions.")
 
-
 (<p> (<b> "Example: "))
 (<pre>
  (<code>
@@ -1297,7 +1295,6 @@ if "(<code>(<var> 'array))" is not a mutable array.")
       (B (make-array (make-interval '#(4 0 4)) list)))
   (array-empty? A)   ;; => #f
   (array-empty? B))  ;; => #t"))
-
 
 (format-lambda-list '(make-specialized-array interval #\[ storage-class #\[ initial-value #\] #\]))
 (<p> "Constructs a mutable specialized array from its arguments.")
@@ -1554,7 +1551,6 @@ indexer:       (lambda multi-index
  1 0 => (1 0)
  1 1 => (1 1)"))
 
-
 (format-lambda-list '(array-curry array inner-dimension))
 (<p> "Assumes that "
      (<code>(<var> 'array))
@@ -1798,9 +1794,7 @@ $$
   ((28 29 30)                  ;; lower right corner
    (34 35 36))))"))
 
-
 (<p> (<b> "Note: ")"The procedures "(<code>'array-tile)" and "(<code>'array-curry)" both decompose an array into subarrays, but in different ways.  For example, if "(<code>(<var>'A))" is defined as "(<code>"(make-array (make-interval '#(10 10)) list)")", then "(<code>"(array-tile "(<var>'A)" '#(1 10))")" returns an array with domain "(<code>"(make-interval '#(10 1))")" for which the value at the multi-index "(<code>"("(<var>'i)" 0)")" is an array with domain "(<code>"(make-interval (vector "(<var>'i)" 0) (vector (+ "(<var>'i)" 1) 10))")" (i.e., a two-dimensional array whose elements are two-dimensional arrays), while "(<code>"(array-curry "(<var>'A)" 1)")" returns an array with domain "(<code>"(make-interval '#(10))")", each element of which has domain "(<code>"(make-interval '#(10))")" (i.e., a one-dimensional array whose elements are one-dimensional arrays).")
-
 
 (format-lambda-list '(array-translate array translation))
 (<p> "Assumes that "(<code>(<var>'array))" is an array, "(<code>(<var>'translation))" is a translation, and that the dimensions of the array and the translation are the same. The resulting array will have domain "(<code>"(interval-translate (array-domain array) translation)")".")
@@ -1916,7 +1910,6 @@ C:
 
 (<p> "Mathematically, we can define $\\pi^{-1}$, the inverse of a permutation $\\pi$, such that $\\pi^{-1}$ composed with $\\pi$ gives the identity permutation.  Then the getter of the new array is, in pseudo-code, "(<code>"(lambda multi-index (apply "(<var>'old-getter)" (")"$\\pi^{-1}$"(<code>" multi-index)))")".  We have assumed that $\\pi^{-1}$ takes a list as an argument and returns a list as a result.")
 
-
 (<p> "Employing this same pseudo-code, if "(<code>(<var>'array))" is a specialized array and we denote the permutation by $\\pi$, then "(<code>'array-permute)" returns the new specialized array")
 (<pre>(<code>
 "(specialized-array-share "(<var>'array)"
@@ -1924,7 +1917,6 @@ C:
                          (lambda multi-index
                            (apply values ("(<unprotected> "&pi;")(<sup>"-1")" multi-index))))"))
 (<p> "The resulting array shares the body of "(<code>(<var>'array))", as well as its  mutability.")
-
 
 (<p> "Again employing this same pseudo-code, if "(<code>(<var>'array))" is not a specialized array, but is
 a mutable array, then "(<code>'array-permute)" returns the new mutable array")
@@ -1969,7 +1961,6 @@ B:
  1 0 0 => (0 0 1)
  1 1 0 => (0 1 1)
  1 2 0 => (0 2 1)"))
-
 
 (format-lambda-list '(array-reverse array #!optional flip?))
 (<p> "We assume that "(<code>(<var>'array))" is an array and "(<code>(<var>'flip?))", if given, is a vector of booleans whose length is the same as the dimension of "(<code>(<var>'array))".  If "(<code>(<var>'flip?))" is not given, it is set to a vector with length the same as the dimension of "(<code>(<var>'array))", all of whose elements are "(<code> "#t")".")
@@ -2054,7 +2045,6 @@ B:
 (palindrome? \"abbc\") => #f
 (palindrome? \"AManAPlanACanalPanama\") => #t
 "))
-
 
 (format-lambda-list '(array-sample array scales))
 (<p> "Assumes that "(<code>(<var>'array))" is an array all of whose lower bounds are zero, "
@@ -2312,7 +2302,6 @@ insert axis 2:
                     (-6  4  5)
                     (-1  2  3))))
 
-
 (define average-of-rows
   (array-copy
    (array-map (lambda (column)
@@ -2325,7 +2314,6 @@ insert axis 2:
 (define centered-rows (array-copy (array-map - A average-of-rows)))
 
 (array->list* centered-rows) ;; => ((2 1 2) (3 -3 -6) (-5 2 3) (0 0 1))"))
-
 
 (format-lambda-list '(array-outer-product operator array1 array2))
 (<p> "Implements the outer product of "(<code>(<var>'array1))" and "(<code>(<var>'array2))" with the operator "(<code>(<var>'operator))", similar to the APL function with the same name.")
@@ -2460,7 +2448,6 @@ B:
  4 2 => 8
  4 3 => 12
  4 4 => 16"))
-
 
 (format-lambda-list '(array-for-each f array #\. arrays))
 (<p> "Assumes that "(<code>(<var> 'array))", "(<code>"(car "(<var> 'arrays)")")", ... are arrays and "(<code>(<var> 'f))" is a procedure.")
@@ -2620,7 +2607,6 @@ We attempt to compute this in floating-point arithmetic in two ways. In the firs
 (<p> "Since $\\pi^2/6\\approx{}$"(<code>"1.6449340668482264")", we see  using the first method that the difference $\\pi^2/6-{}$"(<code>"1.644934057834575")"${}\\approx{}$"(<code>"9.013651380840315e-9")" and with the second we have "
      "$\\pi^2/6-{}$"(<code>"1.6449340658482325")"${}\\approx{}$"(<code>"9.99993865491433e-10")".  The true difference should be between $\\frac 1{1{,}000{,}000{,}001}\\approx{}$"(<code>"9.99999999e-10")" and $\\frac 1{1{,}000{,}000{,}000}={}$"(<code>"1e-9")". The difference for the first method is about 10 times too big, and, in fact, will not change further because any further terms, when added to the partial sum, are too small to increase the sum after rounding-to-nearest in double-precision IEEE-754 floating-point arithmetic.")
 
-
 (format-lambda-list '(array-any predicate array #\. arrays))
 (<p> "Assumes "(<code>"(cons "(<var>"array arrays")")")" is a list of arrays.")
 (<p> "If the parameter "(<code>'array-broadcasting?)" is "(<code>'#t)" at the time the procedure is called, then the array arguments are "(<a> href: "#implicit-array-broadcasting" "implicitly broadcast")" before the procedure body is executed; otherwise, it is required that all array arguments have the same domain. We'll call the common domain of the (possibly broadcast) arrays "(<code>'interval)".  Also assumes that "(<code>(<var>'predicate))" is a procedure that takes as many arguments as there are arrays and returns a single value.")
@@ -2654,7 +2640,6 @@ We attempt to compute this in floating-point arithmetic in two ways. In the firs
 (<p> "The procedures "(<code>"(array-getter "(<var>'array)")")", etc., are applied only to those values of "(<code>'interval)" necessary to determine the result of "(<code>'array-every)".")
 (<p> "It is an error if the arguments do not satisfy these assumptions.")
 (<p> "For an example, see the palindrome example above.")
-
 
 (format-lambda-list '(array->list array) 'array-rarrow-list)
 (<p> "Stores the elements of "(<code>(<var>'array))" into a newly allocated list in lexicographical order.  It is an error if "(<code>(<var>'array))" is not an array.")
@@ -2854,7 +2839,6 @@ B:
  9 => 9
  10 => 10
  11 => 11"))
-
 
 (format-lambda-list '(vector*->array d nested-vector #\[ storage-class  #\[ mutable? #\] #\]) 'vector*-rarrow-array)
 (<p> "Assumes that "(<code>(<var>'d))" is a nonnegative exact integer and, if given, "(<code>(<var>'storage-class))" is a storage class and "(<code>(<var>'mutable?))" is a boolean.")
@@ -3061,7 +3045,6 @@ A after assignment:
  3 1 => 11
  3 2 => 12"))
 
-
 (format-lambda-list '(array-append k arrays #\[ storage-class #\[ mutable? #\] #\]))
 (format-lambda-list '(array-append! k arrays #\[ storage-class #\[ mutable?  #\] #\]))
 (<p> "Assumes that "(<code>(<var>'arrays))" is a nonempty list of arrays with domains that differ at most in the "(<code>(<var>'k))"'th axis,  "(<code>(<var>'k))" is an exact integer between 0 (inclusive) and the dimension of the array domains (exclusive), and, if given, "(<code>(<var>'storage-class))" is a storage class and "(<code>(<var>'mutable?))" is a boolean.")
@@ -3148,7 +3131,6 @@ A after assignment:
  ((1 0) (1 1) (1 2) (1 3) (1 4) (1 5))
  ((3 0) (3 1) (3 2) (3 3) (3 4) (3 5)))"))
 (<p> "Because this SRFI supports empty arrays, the same code works when $k=0$ (when the second extracted array is empty) or $k=m-1$ (when the third extracted array is empty).")
-
 
 (format-lambda-list '(array-block AofA #\[ storage-class #\[ mutable? #\] #\]))
 (format-lambda-list '(array-block! AofA #\[ storage-class #\[ mutable? #\] #\]))
@@ -3568,7 +3550,6 @@ translate: ")
  (<dd> (<code> "(let ((A! (array-setter A))) ... (A! object k1 ...) ...)")" or "(<code> "(array-set! A object k1 ...)"))
  )
 
-
 (<h3> (<a> id: "Racket" "Racket's array library"))
 (<p> "Racket has an extensive "(<a> href: "https://docs.racket-lang.org/math/array.html" "array library")", written by Neil Toronto, as part of its \"Math Library\".  I do not claim to have a complete understanding of Racket's array library, but attempt here to  give a superficial comparison of some aspects of Racket's library with this proposal:")
 (<ul>
@@ -3846,7 +3827,6 @@ order in "(<code>'array-copy)" guarantees the the correct order of execution of 
 
 (<p> (<b> "Viewing two-dimensional slices of three-dimensional data. ")"One example might be viewing two-dimensional slices of three-dimensional data in different ways.  If one has a $1024 \\times 512\\times 512$ 3D image of the body stored as a variable "(<code>(<var>'body))", then one could get 1024 axial views, each $512\\times512$, of this 3D body by "(<code> "(array-curry "(<var>'body)" 2)")"; or 512 median views, each $1024\\times512$, by "(<code> "(array-curry (array-permute "(<var>'body)" (index-first 3 1)) 2)")"; or finally 512 frontal views, each again $1024\\times512$ pixels, by "(<code> "(array-curry (array-permute "(<var>'body)" (index-first 3 2)) 2)")"; see "(<a> href: "https://en.wikipedia.org/wiki/Anatomical_plane" "Anatomical plane")".  Note that you want to have the head up in both the median and frontal views, so we use "(<code>'index-first)" to provide the appropriate permutations.")
 
-
 (<p> (<b> "Calculating second differences of images. ")"For another example, if a real-valued function is defined
 on a two-dimensional interval $I$, its second difference in the direction $d$ at the point $x$ is defined as $\\Delta^2_df(x)=f(x+2d)-2f(x+d)+f(x)$,
 and this function is defined only for those $x$ for which $x$, $x+d$, and $x+2d$ are all in $I$. See the beginning of the section on \"Moduli of smoothness\" in "(<a> href: "https://www.math.purdue.edu/~lucier/692/related_papers_summaries.html#Wavelets-and-approximation-theory" "these notes on wavelets and approximation theory")" for more details.")
@@ -3992,8 +3972,6 @@ Second-differences in the direction $k\\times (1,-1)$:
   ((36. 36.)
    (36. 36.))))")
 (<p> "You can see that with differences in the direction of only the first coordinate, the domains of the difference arrays get smaller in the first coordinate while staying the same in the second coordinate, and with differences in the diagonal directions, the domains of the difference arrays get smaller in both coordinates.")
-
-
 
 (<p> (<b> "Separable operators. ")"Many multi-dimensional transforms in signal processing are "(<i> 'separable)", in that the multi-dimensional transform can be computed by applying one-dimensional transforms in each of the coordinate directions.  Examples of such transforms include the Fast Fourier Transform and the "(<a> href: "https://arxiv.org/abs/1210.1944" "Fast Hyperbolic Wavelet Transform")".  Each one-dimensional subdomain of the complete domain is called a "(<i> 'pencil)", and the same one-dimensional transform is applied to all pencils in a given direction. Given the one-dimensional array transform, one can define the multidimensional transform as follows:")
 (<pre> (<code>"(define (make-separable-transform 1D-transform)
@@ -4288,7 +4266,6 @@ The code uses "(<code>'array-map)", "(<code>'array-assign!)", "(<code>'specializ
 ;;; 1/3     1       1       0
 ;;; 1/4     9/10    3/2     1
 
-
 (display \"\\nUpper triangular matrix of decomposition of Hilbert matrix:\\n\\n\")
 (array-display (U A))
 
@@ -4442,7 +4419,6 @@ The code uses "(<code>'array-map)", "(<code>'array-assign!)", "(<code>'specializ
  (0 0 0 0 0 0 0 0 0 0)
  (0 0 0 0 0 0 0 0 0 0))"))
 
-
 (<p> (<b> (<a> id: "gauss-seidel" "Iterative methods for solving linear systems. "))"We give an extended example how one might program the "(<a> href: "https://en.wikipedia.org/wiki/Jacobi_method" "Jacobi")" and "(<a> href: "https://en.wikipedia.org/wiki/Gauss%E2%80%93Seidel_method" "Gauss-Seidel")" iterative methods for some linear systems of equations.")
 (<p> "We first define a procedure to compute the "(<a> href: "https://en.wikipedia.org/wiki/Matrix_norm#Frobenius_norm" "Frobenius norm")" of the difference between two arrays:")
 
@@ -4481,7 +4457,6 @@ The code uses "(<code>'array-map)", "(<code>'array-assign!)", "(<code>'specializ
 (let ((interior (interval-dilate (array-domain X) '#(1 1) '#(-1 -1))))
   (array-assign! (array-extract X interior)
                  (make-array interior (lambda args 0.))))"))
-
 
 (<p> "The basic iteration is the same for the Jacobi and Gauss-Seidel iterations, it depends only on whether the output array where the computed elements are stored is different from the input array: ")
 
