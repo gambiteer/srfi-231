@@ -2927,11 +2927,9 @@ B:
   #(1/6 1/7 1/8 1/9 1/10 1/11))"))
 
 (format-lambda-list '(array-assign! destination source))
-(<p> "Assumes that "(<code>(<var>'destination))" is a mutable array and "(<code>(<var>'source))" is an array with the same domain, and that the elements of "(<code>(<var>'source))" can be stored into "(<code>(<var>'destination))".")
-(<p> "Evaluates "(<code>"(array-getter "(<var>'source)")")" on the multi-indices in "(<code>"(array-domain "(<var>'source)")")" in lexicographical order, "
-     "and assigns each value to the multi-index in "(<code>(<var>'destination))" in the same lexicographical order.")
+(<p> "Assumes that "(<code>(<var>'destination))" is a mutable array and "(<code>(<var>'source))" is an array with the same domain and that the elements of "(<code>(<var>'source))" can be stored into "(<code>(<var>'destination))".")
+(<p> (<code>'array-assign!)" evaluates "(<cv>'source)"'s getter to obtain a value, and then applies "(<cv>'destination)"'s setter to that value, for each each multi-index in the common domain of the arguments; that is, it alternates computing the getter of "(<cv>'source)" and the setter of "(<cv>'destination)" at each multi-index (in lexicographical order) in their common domain.")
 (<p> "It is an error if the arguments don't satisfy these assumptions.")
-(<p> "If assigning any element of "(<code>(<var>'destination))" affects the value of any element of "(<code>(<var>'source))", then the result is undefined.")
 (<p> (<b> "Example: "))(<pre>(<code>"(let* ((A (array-copy
            (make-array (make-interval '#(5 5))
                        (lambda (i j) (* i j)))
@@ -2958,6 +2956,7 @@ A after assignment:
  (0 2 100 100 100)
  (0 3 100 100 100)
  (0 4 100 100 100))"))
+(<p> "See also the "(<a> href: "#gauss-seidel" "Gauss-Seidel")" linear solver example.")
 
 (format-lambda-list '(array-stack k arrays #\[ storage-class #\[ mutable? #\] #\]))
 (format-lambda-list '(array-stack! k arrays #\[ storage-class #\[ mutable? #\] #\]))
@@ -4444,7 +4443,143 @@ The code uses "(<code>'array-map)", "(<code>'array-assign!)", "(<code>'specializ
  (0 0 0 0 0 0 0 0 0 0))"))
 
 
+(<p> (<b> (<a> id: "gauss-seidel" "Iterative methods for solving linear systems. "))"We give an extended example how one might program the "(<a> href: "https://en.wikipedia.org/wiki/Jacobi_method" "Jacobi")" and "(<a> href: "https://en.wikipedia.org/wiki/Gauss%E2%80%93Seidel_method" "Gauss-Seidel")" iterative methods for some linear systems of equations.")
+(<p> "We first define a procedure to compute the "(<a> href: "https://en.wikipedia.org/wiki/Matrix_norm#Frobenius_norm" "Frobenius norm")" of the difference between two arrays:")
 
+(<pre>(<code>"(define (frobenius X Y)
+  (flsqrt (array-fold-left (lambda (sum x y)
+                             (fl+ sum (flsquare (fl- x y))))
+                           0. X Y)))"))
+
+(<p>"As an example, we will compute approximate solutions to "(<a> href: "https://en.wikipedia.org/wiki/Laplace%27s_equation" "Laplace's equation")" using the "(<a> href: "https://en.wikipedia.org/wiki/Five-point_stencil#In_two_dimensions" "five-point stencil")" approximation to the Laplacian operator. We assume that we're given boundary values of the solution.")
+
+(<p> "For our test problem the domain is the interval $[0,1]^2$; we approximate the solution at the points $(ih,jh)$, where $h=1/N$ is the mesh spacing and we compute on a $(N+1)\\times (N+1)$ grid.  The value of the approximate solution is given on the boundary, where either $ih$ or $jh$ equals $0$ or $1$, and we need to compute the approximate values at interior grid points.")
+
+(<p>"The function we want to approximate is an exact solution to both the continuous and discrete problems, $u(x,y)=x^2-y^2$:")
+(<pre>(<code>
+"(define N 32)
+
+(define exact-result   ;; x^2-y^2 is harmonic.
+  (array-copy!
+   (make-array (make-interval (vector (+ N 1) (+ N 1)))
+               (lambda (i j)
+                 (let ((x (inexact (/ i N)))
+                       (y (inexact (/ j N))))
+                   (fl- (flsquare x) (flsquare y)))))
+   generic-storage-class
+   #t))"))
+
+(<p>"The iteration stops when either (a) a maximum number of iterations is reached, or (b) the Frobenius norm of the difference between the exact and approximate solution is less than a tolerance.  (The tolerance is chosen based on some theory.)")
+(<pre>(<code>
+"(define tolerance (inexact (/ N)))
+(define max-iterations 20000)"))
+
+(<p>" We compute the initial array for the iteration, which has the correct boundary values but is zero in the interior of the grid:")
+(<pre>(<code>
+"(define X (array-copy! exact-result))
+
+(let ((interior (interval-dilate (array-domain X) '#(1 1) '#(-1 -1))))
+  (array-assign! (array-extract X interior)
+                 (make-array interior (lambda args 0.))))"))
+
+
+(<p> "The basic iteration is the same for the Jacobi and Gauss-Seidel iterations, it depends only on whether the output array where the computed elements are stored is different from the input array: ")
+
+(<pre>(<code>"(define (jacobi-iteration! OUT IN)
+  ;; A single iteration for approximately solving the two-dimensional linear
+  ;; system derived from a finite difference method for Laplace's equation
+  ;; If IN and OUT are different, this is a Jacobi iteration.
+  ;; If IN and OUT are the same, this is a Gauss-Seidel iteration.
+  (let ((interior (interval-dilate (array-domain IN) '#(1 1)  '#(-1 -1))))
+    (array-assign!
+     (array-extract OUT interior)
+     (apply array-map
+            (lambda (left right up down)
+              (fl* 0.25 (fl+ left right up down)))
+            (map (lambda (translation)
+                   (array-extract (array-translate IN translation)
+                                  interior))
+                 '(#(0 -1) #(0 1) #(-1 0) #(1 0)))))))"))
+
+(<p> "For the Jacobi method, we maintain two arrays of approximations, and alternately use each of them as the source and the destination of the basic computation:")
+(<pre>(<code>
+"(define (jacobi-2d X iterations tolerance exact-answer)
+  (let* ((X_0 (array-copy X))
+         (X_1 (array-copy X_0)))
+    (let loop ((n 0)
+               (X_k X_0)
+               (X_k+1 X_1))
+      (jacobi-iteration! X_k+1 X_k)
+      (if (and (fxzero? (fxremainder n 10))
+               (or (fx>= n iterations)
+                   (fl< (frobenius exact-answer X_k+1) tolerance)))
+          (begin
+            (pretty-print (list jacobi-iterations: n
+                                error: (frobenius exact-answer X_k+1)))
+            X_k+1)
+          ;; Swap X_k and X_k+1
+          (loop (fx+ n 1) X_k+1 X_k)))))"))
+
+(<p> "The Gauss-Seidel iteration overwrites the input array during the computation, so we need only maintain one array.  We add an option to alternate forward and backward iterations:")
+(<pre>(<code>"(define (gauss-seidel-2d X iterations tolerance exact-answer
+                         #!optional (symmetric? #t))
+  (let* ((X_0 (array-copy X)))
+    (let loop ((n 0)
+               (X_k X_0))
+      (jacobi-iteration! X_k X_k)                   ;; forward gauss-seidel
+      (if symmetric?
+          (let ((reversed (array-reverse X_k)))
+            (jacobi-iteration! reversed reversed))) ;; backward gauss-seidel
+      (if (and (fxzero? (fxremainder n 10))
+               (or (fx>= n iterations)
+                   (fl< (frobenius exact-answer X_k) tolerance)))
+          (begin
+            (pretty-print (list gauss-seidel-iterations: n
+                                error: (frobenius exact-answer X_k)
+                                symmetric?: symmetric?))
+            X_k)
+          (loop (fx+ n 1) X_k)))))"))
+(<p> "The reverse pass relies on the fact that "(<code>'array-assign!)" traverses the multi-indices in lexicographical order.")
+(<p>"Finally, we can compute some examples:")
+(<pre>(<code>
+"(define jacobi-result
+  (time (jacobi-2d X max-iterations tolerance exact-result)))
+
+(define symmetric-gauss-seidel-result
+  (time (gauss-seidel-2d X max-iterations tolerance exact-result)))
+
+(define gauss-seidel-result
+  (time (gauss-seidel-2d X max-iterations tolerance exact-result #f)))"))
+(<p>"We see the results:")
+(<pre>(<code>
+"(jacobi-iterations: 470 error: .030765499084941455)
+(time (jacobi-2d X max-iterations tolerance exact-result))
+    0.033253 secs real time
+    0.033187 secs cpu time (0.032218 user, 0.000969 system)
+    no collections
+    12028176 bytes allocated
+    1478 minor faults
+    no major faults
+    119398257 cpu cycles
+(gauss-seidel-iterations: 120 error: .028487692987866426 symmetric?: #t)
+(time (gauss-seidel-2d X max-iterations tolerance exact-result))
+    0.017056 secs real time
+    0.017014 secs cpu time (0.014501 user, 0.002513 system)
+    no collections
+    6401352 bytes allocated
+    784 minor faults
+    no major faults
+    61235808 cpu cycles
+(gauss-seidel-iterations: 240 error: .02876354995927427 symmetric?: #f)
+(time (gauss-seidel-2d X max-iterations tolerance exact-result #f))
+    0.017128 secs real time
+    0.017097 secs cpu time (0.017096 user, 0.000001 system)
+    no collections
+    6160840 bytes allocated
+    753 minor faults
+    no major faults
+    61501869 cpu cycles"))
+(<p> "We see that in this instance alternating the direction of the Gauss-Seidel iteration doesn't improve performance.")
 
 (<p> (<b> "Inner products. ")"Our "(<code>'array-inner-product)" procedure differs from that found in APL in a number of ways, including that the result is always an array, never a scalar.")
 (<p> "We take some examples from the "(<a> href: "https://www.dyalog.com/uploads/aplx/APLXLangRef.pdf" "APLX Language Reference")":")
