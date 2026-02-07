@@ -596,7 +596,7 @@ of the interval.")
         (<p> "Intervals are a data type distinct from other Scheme data types.")
 
         (<h3> (<a> id: "intervalprocedures" "Procedures"))
-        (format-lambda-list '(make-interval arg1 #!optional arg2))
+        (format-lambda-list '(make-interval arg1 #\[ arg2 #\]))
         (<p> "Create a new interval. Assumes that "(<code> (<var>"arg1"))" and "(<code> (<var>"arg2"))" (if given) are vectors (of the same length) of exact integers.")
         (<p> "If "(<code> (<var>"arg2"))" is not given, then the entries of "(<code> (<var>"arg1"))", if any, must be nonnegative, and they are taken as the "(<code>(<var>"upper-bounds"))" of the interval, and  "(<code> (<var>"lower-bounds"))" is set to a vector of the same length with exact zero entries.")
         (<p> "If "(<code> (<var>"arg2"))" is given, then "(<code> (<var>"arg1"))" is taken to be "(<code> (<var>"lower-bounds"))" and "(<code> (<var>"arg2"))" is taken to be "(<code> (<var>"upper-bounds"))", which must satisfy")
@@ -1962,7 +1962,7 @@ B:
  1 1 0 => (0 1 1)
  1 2 0 => (0 2 1)"))
 
-(format-lambda-list '(array-reverse array #!optional flip?))
+(format-lambda-list '(array-reverse array #\[ flip? #\]))
 (<p> "We assume that "(<code>(<var>'array))" is an array and "(<code>(<var>'flip?))", if given, is a vector of booleans whose length is the same as the dimension of "(<code>(<var>'array))".  If "(<code>(<var>'flip?))" is not given, it is set to a vector with length the same as the dimension of "(<code>(<var>'array))", all of whose elements are "(<code> "#t")".")
 (<p> (<code>'array-reverse)" returns a new array  that is specialized,  mutable, or immutable according to whether "(<code>(<var>'array))" is specialized, mutable, or immutable, respectively.  Informally, if "(<code>"(vector-ref "(<var>'flip?)" k)")" is true, then the ordering of multi-indices in the k'th coordinate direction is reversed, and is left undisturbed otherwise.")
 (<p> "More formally, we introduce the procedure ")
