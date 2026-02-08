@@ -89,7 +89,7 @@
       <li>The routines <code>array-outer-product</code> and <code>array-inner-product</code> are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure <code>array-inner-product</code> now returns a specialized, not a generalized, array result.</li>
       <li>Both <a href="#explicit-array-broadcasting">explicit</a> and <a href="#implicit-array-broadcasting">implicit</a> array broadcasting are specified in this SRFI extension and in implemented in the sample implementation.</li>
       <li>The parameter <a href="#array-broadcasting?">array-broadcasting?</a> has been added to the SRFI.</li>
-      <li>The routines <a href="#interval-rebase"><code>interval-rebase</code></a>, <a href="#array-rebase"><code>array-rebase</code></a>, <a href="#interval-insert-axis"><code>interval-insert-axis</code></a>, <a href="#object-rarrow-array"><code>object-&gt;array</code></a>, <a href="#array-insert-axis"><code>array-insert-axis</code></a>, <a href="#compute-broadcast-interval"><code>compute-broadcast-interval</code></a>,<a href="#array-broadcast"><code>array-broadcast</code></a> have been added to the SRFI.</li>
+      <li>The routines <a href="#interval-every"><code>interval-every</code></a>, <a href="#interval-any"><code>interval-any</code></a>, <a href="#interval-rebase"><code>interval-rebase</code></a>, <a href="#array-rebase"><code>array-rebase</code></a>, <a href="#interval-insert-axis"><code>interval-insert-axis</code></a>, <a href="#object-rarrow-array"><code>object-&gt;array</code></a>, <a href="#array-insert-axis"><code>array-insert-axis</code></a>, <a href="#compute-broadcast-interval"><code>compute-broadcast-interval</code></a>,<a href="#array-broadcast"><code>array-broadcast</code></a> have been added to the SRFI.</li>
     </ul>
     <h2><a id="Overview">Overview</a></h2>
     <h3><a id="Introductory">Introductory remarks</a></h3>
@@ -249,6 +249,8 @@
         <a href="#interval-for-each">interval-for-each</a>,
         <a href="#interval-fold-left">interval-fold-left</a>,
         <a href="#interval-fold-right">interval-fold-right</a>,
+        <a href="#interval-every">interval-every</a>,
+        <a href="#interval-any">interval-any</a>,
         <a href="#interval-dilate">interval-dilate</a>,
         <a href="#interval-intersect">interval-intersect</a>,
         <a href="#interval-insert-axis">interval-insert-axis</a>,
@@ -642,6 +644,54 @@
             (A! 0 j))))))
 
 (length (eratosthenes 1000000)) =&gt; 78498</code></pre>
+    <p><b>Procedure: </b><code><a id="interval-every">interval-every</a> <var>f</var> <var>interval</var></code></p>
+    <p><b>Procedure: </b><code><a id="interval-any">interval-any</a> <var>f</var> <var>interval</var></code></p>
+    <p>These procedures assume that <code><var>f</var></code> is a procedure and <code><var>interval</var></code> is an interval.</p>
+    <p>These procedures apply <code><var>f</var></code> to the multi-indices in <code><var>interval</var></code> in lexicographical order; <code>interval-every</code> returns the first false computed value and <code>interval-any</code> returns the first non-false computed value.  If no computed value is <code>#f</code>, then <code>interval-every</code> returns <code><var>f</var></code> applied to the last multi-index in <code><var>interval</var></code>, or <code>#t</code> if the interval is empty; if every computed value is <code>#f</code>, then <code>interval-any</code> returns <code><var>f</var></code> applied to the last multi-index in <code><var>interval</var></code>, or <code>#f</code> if the interval is empty; in both cases <code><var>f</var></code> is called in tail position.</p>
+    <p>It is an error of the arguments do not satisfy these conditions.</p>
+    <p><b>Examples: </b>
+      <pre><code>(let* ((A (list*-&gt;array 2 '((1 2 3)
+                            (0 4 5)
+                            (0 0 6))))
+       (A_ (array-getter A)))
+  (interval-every (lambda (i j)
+                    (or (&lt;= i j)
+                        (zero? (A_ i j))))
+                  (array-domain A)))     ;; =&gt; #t
+
+
+(let* ((A (list*-&gt;array 2 '((1 2 3)
+                            (0 4 5)
+                            (0 0 6))))
+       (A_ (array-getter A)))
+  (interval-any (lambda (i j)
+                  (and (&lt; j i)
+                       (positive? (A_ i j))))
+                (array-domain A)))       ;; =&gt; #f
+
+(let* ((A (list*-&gt;array 2 '((1 2 3)
+                            (0 4 5)
+                            (1 0 6))))
+       (A_ (array-getter A)))
+  (interval-every (lambda (i j)
+                    (or (&lt;= i j)
+                        (zero? (A_ i j))))
+                  (array-domain A)))     ;; =&gt; #f
+
+(let* ((A (list*-&gt;array 2 '((1 2 3)
+                            (0 4 5)
+                            (1 0 6))))
+       (A_ (array-getter A)))
+  (interval-any (lambda (i j)
+                  (and (&lt; j i)
+                       (positive? (A_ i j))))
+                (array-domain A)))       ;; =&gt; #t
+
+(interval-every + (make-interval '#()))  ;; =&gt; 0
+(interval-any * (make-interval '#()))    ;; =&gt; 1
+
+(interval-every + (make-interval '#(0))) ;; =&gt; #t
+(interval-any * (make-interval '#(0)))   ;; =&gt; #f</code></pre></p>
     <p><b>Procedure: </b><code><a id="interval-dilate">interval-dilate</a> <var>interval</var> <var>lower-diffs</var> <var>upper-diffs</var></code></p>
     <p>Assumes that <code><var>interval</var></code> is an interval with
       lower bounds $\ell_0,\dots,\ell_{d-1}$ and

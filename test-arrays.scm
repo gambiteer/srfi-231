@@ -2224,6 +2224,66 @@ OTHER DEALINGS IN THE SOFTWARE.
               ;; for d < 5 we rely on the built-in check
               "Wrong number of arguments passed to procedure "))))
 
+(pp "interval-every and interval-any'")
+
+(test (interval-every 'a 'b)
+      "interval-every: The first argument is not a procedure: ")
+
+(test (interval-every + 'a)
+      "interval-every: The second argument is not an interval: ")
+
+(test (interval-any 'a 'b)
+      "interval-any: The first argument is not a procedure: ")
+
+(test (interval-any + 'a)
+      "interval-any: The second argument is not an interval: ")
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (0 0 6))))
+       (A_ (array-getter A)))
+  (test (interval-every (lambda (i j)
+                          (or (<= i j)
+                              (zero? (A_ i j))))
+                        (array-domain A))
+        #t))
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (1 0 6))))
+       (A_ (array-getter A)))
+  (test (interval-every (lambda (i j)
+                          (or (<= i j)
+                              (zero? (A_ i j))))
+                        (array-domain A))
+        #f))
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (0 0 6))))
+       (A_ (array-getter A)))
+  (test (interval-any (lambda (i j)
+                        (and (< j i)
+                             (positive? (A_ i j))))
+                      (array-domain A))
+        #f))
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (1 0 6))))
+       (A_ (array-getter A)))
+  (test (interval-any (lambda (i j)
+                        (and (< j i)
+                             (positive? (A_ i j))))
+                      (array-domain A))
+        #t))
+
+(test (interval-every + (make-interval '#())) 0)
+(test (interval-any * (make-interval '#())) 1)
+
+(test (interval-every + (make-interval '#(0))) #t)
+(test (interval-any * (make-interval '#(0))) #f)
+
 (pp "array-every and array-any error tests")
 
 (test (array-every 1 2)

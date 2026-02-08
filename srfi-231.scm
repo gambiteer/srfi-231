@@ -144,6 +144,8 @@ MathJax.Hub.Config({
          (<li> "Both "(<a> href: "#explicit-array-broadcasting" "explicit")" and "(<a> href: "#implicit-array-broadcasting" "implicit")" array broadcasting are specified in this SRFI extension and in implemented in the sample implementation.")
          (<li> "The parameter "(<a> href: "#array-broadcasting?" "array-broadcasting?")" has been added to the SRFI.")
          (<li> "The routines "
+               (<a> href: "#interval-every" (<code>'interval-every))", "
+               (<a> href: "#interval-any" (<code>'interval-any))", "
                (<a> href: "#interval-rebase" (<code>'interval-rebase))", "
                (<a> href: "#array-rebase" (<code>'array-rebase))", "
                (<a> href: "#interval-insert-axis" (<code>'interval-insert-axis))", "
@@ -437,6 +439,8 @@ So we had to make some decisions about how to broadcast generalized arrays and a
                  (<a> href: "#interval-for-each" "interval-for-each")END
                  (<a> href: "#interval-fold-left" "interval-fold-left")END
                  (<a> href: "#interval-fold-right" "interval-fold-right")END
+                 (<a> href: "#interval-every" "interval-every") END
+                 (<a> href: "#interval-any" "interval-any") END
                  (<a> href: "#interval-dilate" "interval-dilate")END
                  (<a> href: "#interval-intersect" "interval-intersect")END
                  (<a> href: "#interval-insert-axis" "interval-insert-axis")END
@@ -854,6 +858,60 @@ $[l_0,u_0)\\times [l_1,u_1)\\times\\cdots\\times[l_{d-1},u_{d-1})$\n"
             (A! 0 j))))))
 
 (length (eratosthenes 1000000)) => 78498"))
+
+        (format-lambda-list '(interval-every f interval))
+        (format-lambda-list '(interval-any f interval))
+        (<p> "These procedures assume that "(<cv>'f)" is a procedure and "(<cv>'interval)" is an interval.")
+        (<p> "These procedures apply "(<cv>'f)" to the multi-indices in "(<cv>'interval)" in lexicographical order; "
+             (<code>'interval-every)" returns the first false computed value and "(<code>'interval-any)
+             " returns the first non-false computed value.  If no computed value is "(<code>'#f)", then "
+             (<code>'interval-every)" returns "(<cv>'f)" applied to the last multi-index in "(<cv>'interval)
+             ", or "(<code>'#t)" if the interval is empty; if every computed value is "(<code>'#f)", then "(<code>'interval-any)
+             " returns "(<cv>'f)" applied to the last multi-index in "(<cv>'interval)", or "(<code>'#f)
+             " if the interval is empty; in both cases "(<cv>'f)" is called in tail position.")
+        (<p> "It is an error of the arguments do not satisfy these conditions.")
+        (<p> (<b> "Examples: ")(<pre>(<code>"(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (0 0 6))))
+       (A_ (array-getter A)))
+  (interval-every (lambda (i j)
+                    (or (<= i j)
+                        (zero? (A_ i j))))
+                  (array-domain A)))     ;; => #t
+
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (0 0 6))))
+       (A_ (array-getter A)))
+  (interval-any (lambda (i j)
+                  (and (< j i)
+                       (positive? (A_ i j))))
+                (array-domain A)))       ;; => #f
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (1 0 6))))
+       (A_ (array-getter A)))
+  (interval-every (lambda (i j)
+                    (or (<= i j)
+                        (zero? (A_ i j))))
+                  (array-domain A)))     ;; => #f
+
+(let* ((A (list*->array 2 '((1 2 3)
+                            (0 4 5)
+                            (1 0 6))))
+       (A_ (array-getter A)))
+  (interval-any (lambda (i j)
+                  (and (< j i)
+                       (positive? (A_ i j))))
+                (array-domain A)))       ;; => #t
+
+(interval-every + (make-interval '#()))  ;; => 0
+(interval-any * (make-interval '#()))    ;; => 1
+
+(interval-every + (make-interval '#(0))) ;; => #t
+(interval-any * (make-interval '#(0)))   ;; => #f")))
 
         (format-lambda-list '(interval-dilate interval lower-diffs upper-diffs))
         (<p> "Assumes that "(<code>(<var> 'interval))" is an interval with

@@ -22,6 +22,7 @@
     interval-projections
     interval-for-each
     interval-fold-left interval-fold-right
+    interval-every interval-any
     interval-dilate
     interval-intersect
     interval-insert-axis

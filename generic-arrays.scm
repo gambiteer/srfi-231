@@ -4564,9 +4564,26 @@ OTHER DEALINGS IN THE SOFTWARE.
          `(begin
             ,(make-predicate 'every 'and)
             ,(make-predicate 'any 'or))))
+    #; (pp result)
     result))
 
 (macro-make-predicates)
+
+(define (interval-every f interval)
+  (cond ((not (procedure? f))
+         (error "interval-every: The first argument is not a procedure: " f interval))
+        ((not (interval? interval))
+         (error "interval-every: The second argument is not an interval: " f interval))
+        (else
+         (%%interval-every f interval))))
+
+(define (interval-any f interval)
+  (cond ((not (procedure? f))
+         (error "interval-any: The first argument is not a procedure: " f interval))
+        ((not (interval? interval))
+         (error "interval-any: The second argument is not an interval: " f interval))
+        (else
+         (%%interval-any f interval))))
 
 (define (%%array-every f arrays)
   (%%interval-every (%%specialize-function-applied-to-array-getters f arrays)

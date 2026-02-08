@@ -1652,7 +1652,7 @@
      (%%specialize-function-applied-to-array-getters f arrays)
      (array-domain (car arrays)))))
 
-(define (%%interval-every f interval)
+(define (interval-every f interval)
   (or (eqv? (interval-volume interval) 0)
       (let ((reversed-lowers (reverse (interval-lower-bounds->list interval)))
             (reversed-uppers (reverse (interval-upper-bounds->list interval))))
@@ -1666,7 +1666,7 @@
                                           reversed-uppers)
                          (- index 1))))))))
 
-(define (%%interval-any f interval)
+(define (interval-any f interval)
   (and (not (eqv? (interval-volume interval) 0))
       (let ((reversed-lowers (reverse (interval-lower-bounds->list interval)))
             (reversed-uppers (reverse (interval-upper-bounds->list interval))))
@@ -1682,13 +1682,13 @@
 
 (define (array-every f array . arrays)
   (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-every: ")))
-    (%%interval-every
+    (interval-every
      (%%specialize-function-applied-to-array-getters f arrays)
      (array-domain (car arrays)))))
 
 (define (array-any f array . arrays)
   (let ((arrays (%%broadcast-array-arguments (cons array arrays) "array-any: ")))
-    (%%interval-any
+    (interval-any
      (%%specialize-function-applied-to-array-getters f arrays)
      (array-domain (car arrays)))))
 
