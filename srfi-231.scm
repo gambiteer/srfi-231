@@ -380,28 +380,29 @@ So we had to make some decisions about how to broadcast generalized arrays and a
 
         (<h2> (<a> id: "Notes" "Notes"))
         (<ul>
-         (<li> (<b> "Empty and zero-dimensional arrays: ")"The vectors of upper and lower bounds of an interval can have zero elements, in which case the zero-dimensional interval itself has no elements, but zero-dimensional arrays with this domain have getters and setters that take zero indices as arguments, and which return or set a single element, much like a Scheme "(<code>'box)".  If an interval has at least one upper and lower bound, and at least one of these upper bounds equals the associated lower bound, then that interval is empty, and arrays with empty intervals as domains have getters and setters that should raise an exception when called.")
-         (<li> (<b> "This SRFI and "(<code>'call-with-current-continuation)": ")"The Scheme procedure "(<code>'call-with-current-continuation)" captures and encapsulates as a procedure the continuation of the current computation, which, perforce, includes a certain amount of state that consists of the values of captured variables at the point the continuation is captured. This captured procedure can be invoked multiple times, as any procedure can."
-               (<br>)
-               "No procedure in the sample implementation itself calls "(<code>'call-with-current-continuation)", but the procedural arguments to, e.g., "(<code>'make-array)", "(<code>'specialized-array-share)", "(<code>'array-map)", etc., may themselves call "(<code>'call-with-current-continuation)"."
-               (<br>)
-               "All procedures in the sample implementation whose names do not end with an exclamation point (!) are written in a way that does not modify the state of any data captured by a continuation. We call such procedures "(<i>"call/cc safe")"."
-               (<br>)
-               "It is intended that all procedures in this library whose names do not end with an exclamation point (!) be implemented in a call/cc-safe way."
-               (<br>)
-               "Besides the procedures "(<code>'array-set!)" and "(<code>'array-assign!)", which explicitly mutate state and which, therefore, are "(<i>'not)" call/cc safe, we provide the procedures "(<code>'array-copy!)", "(<code>'array-stack!)", "(<code>'array-decurry!)", "(<code>'array-append!)", and "(<code>'array-block!)", which are not necessarily call/cc safe, but which may be faster or use less memory than the corresponding call/cc-safe versions."
-               (<br> id: "array-assign-erratum")
-               "For the procedures "(<code>'array-copy!)", "(<code>'array-stack!)", "(<code>'array-decurry!)", "(<code>'array-append!)", and "(<code>'array-block!)", it is an error if the continuation of each call to an array's getter is invoked more than once.  For the procedure "(<code>'array-assign!)", it is an error if the continuation of each call to the destination's setter or the source's getter is invoked more than once.")
-         (<li> (<b> "Relationship to "(<a> href: "https://docs.racket-lang.org/math/array_nonstrict.html#%28tech._nonstrict%29" "nonstrict arrays")" in Racket. ")
-               "It appears that what we call simply arrays in this SRFI are called nonstrict arrays in the math/array library of Racket, which in turn was influenced by an "(<a> href: "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/RArrays.pdf" "array proposal for Haskell")".  Our \"specialized\" arrays are related to Racket's \"strict\" arrays.")
-         (<li> (<b> "Indexers. ")"The argument "(<code>(<var> "new-domain->old-domain"))" to "(<code> 'specialized-array-share)" is, conceptually, the getter of a multi-valued array.")
-         (<li> (<b> "Source of procedure names. ")"The procedure "(<code> 'array-curry)" gets its name from the" #\newline
+         (<li> (<b> "Empty and zero-dimensional arrays: ")"The vectors of upper and lower bounds of an interval can have zero elements, in which case the zero-dimensional interval has a single element, a zero-length multi-index, i.e., "(<code>"(values)")". Zero-dimensional arrays with this domain have getters and setters that take zero indices as arguments and that return or set a single element, much like a Scheme "(<code>'box)".")
+         (<p> "If an interval has at least one upper and lower bound, and at least one of these upper bounds equals the associated lower bound, then that interval is empty, and arrays with empty intervals as domains have getters and setters that should raise an exception when called.")
+         (<li> (<b> "This SRFI and "(<code>'call-with-current-continuation)": ")"The Scheme procedure "(<code>'call-with-current-continuation)" captures and encapsulates as a procedure the continuation of the current computation, which, perforce, includes a certain amount of state that consists of the environment of captured variables at the point the continuation is captured. This captured procedure can be invoked multiple times, as any procedure can."
+               (<p>
+                "No procedure in the sample implementation calls "(<code>'call-with-current-continuation)", but the procedural arguments to, e.g., "(<code>'make-array)", "(<code>'specialized-array-share)", "(<code>'array-map)", etc., may themselves call "(<code>'call-with-current-continuation)".")
+               (<p>
+                "All procedures in the sample implementation whose names do not end with an exclamation point (!) are written in a way that does not modify the state of any data captured by a continuation. We call such procedures "(<i>"call/cc safe")".")
+               (<p>
+               "It is intended that all procedures in this library whose names do not end with an exclamation point (!) be implemented in a call/cc-safe way.")
+               (<p>
+               "Besides the procedures "(<code>'array-set!)" and "(<code>'array-assign!)", which explicitly mutate state and which, therefore, are "(<i>'not)" call/cc safe, we provide the procedures "(<code>'array-copy!)", "(<code>'array-stack!)", "(<code>'array-decurry!)", "(<code>'array-append!)", and "(<code>'array-block!)", which are not necessarily call/cc safe, but which may be faster or use less memory than the corresponding call/cc-safe versions.")
+               (<p> id: "array-assign-erratum"
+                    "For the procedures "(<code>'array-copy!)", "(<code>'array-stack!)", "(<code>'array-decurry!)", "(<code>'array-append!)", and "(<code>'array-block!)", it is an error if the continuation of each call to an array's getter is invoked more than once.  For the procedure "(<code>'array-assign!)", it is an error if the continuation of each call to the destination's setter or the source's getter is invoked more than once."))
+         (<li> (<p> (<b> "Relationship to "(<a> href: "https://docs.racket-lang.org/math/array_nonstrict.html#%28tech._nonstrict%29" "nonstrict arrays")" in Racket. ")
+               "It appears that what we call simply arrays in this SRFI are called nonstrict arrays in the math/array library of Racket, which in turn was influenced by an "(<a> href: "https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/RArrays.pdf" "array proposal for Haskell")".  Our \"specialized\" arrays are related to Racket's \"strict\" arrays."))
+         (<li> (<p> (<b> "Indexers. ")"The argument "(<code>(<var> "new-domain->old-domain"))" to "(<code> 'specialized-array-share)" is, conceptually, the getter of a multi-valued array."))
+         (<li> (<p> (<b> "Source of procedure names. ")"The procedure "(<code> 'array-curry)" gets its name from the "
                (<a> href: "https://en.wikipedia.org/wiki/Currying" "curry operator")
-               " in programming" (string (integer->char 8212)) "we are currying the getter of the array and keeping careful track of the domains." #\newline
-               (<code>'interval-projections)" can be thought of as currying the" #\newline
-               "characteristic procedure of the interval,  encapsulated here as "(<code> 'interval-contains-multi-index?)".")
-         (<li> (<b> "Choice of procedures on intervals. ")"The choice of procedures for both arrays and intervals was motivated almost solely by what I needed for arrays.")
-         (<li> (<b> "Multi-valued arrays. ")"While this SRFI restricts attention to single-valued arrays, wherein the getter of each array returns a single value, allowing multi-valued immutable arrays would be a compatible extension of this SRFI.")
+               " in programming" (string (integer->char 8212)) "we are currying the getter of the array and keeping careful track of the domains. "
+               (<code>'interval-projections)" can be thought of as currying the "
+               "characteristic procedure of the interval,  encapsulated here as "(<code> 'interval-contains-multi-index?)"."))
+         (<li> (<p> (<b> "Choice of procedures on intervals. ")"The choice of procedures for both arrays and intervals was motivated almost solely by what I needed for arrays."))
+         (<li> (<p> (<b> "Multi-valued arrays. ")"While this SRFI restricts attention to single-valued arrays, wherein the getter of each array returns a single value, allowing multi-valued immutable arrays would be a compatible extension of this SRFI."))
          )
         (<h2> (<a> id: "Specification" "Specification"))
         (let ((END ",\n"))
