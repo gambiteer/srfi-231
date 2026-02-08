@@ -3226,8 +3226,8 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (procedure? new-domain->old-domain))
          (error "specialized-array-share: The third argument is not a procedure: "
                 array new-domain new-domain->old-domain))
-        ((and (zero? (%%interval-volume (%%array-domain array)))
-              (positive?  (%%interval-volume new-domain)))
+        ((and (%%array-empty? array)
+              (not (%%interval-empty? new-domain)))
          (error "specialized-array-share: Sharing an empty array to a nonempty interval: " array new-domain new-domain->old-domain))
         (else
          (%%specialized-array-share array
@@ -4542,7 +4542,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         result))
 
     `(define (,(symbol-append '%%interval- name) f interval)
-       (if (eqv? (%%interval-volume interval) 0)
+       (if (%%interval-empty? interval)
            ,(if (eq? name 'any) #f #t)
            (case (%%interval-dimension interval)
              ((0) (f))
