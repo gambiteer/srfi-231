@@ -74,8 +74,10 @@ MathJax.Hub.Config({
         (<h2> "Abstract")
         (<p>
          "This SRFI specifies an array mechanism for Scheme. Arrays as defined here are quite general; at their most basic, an array is simply a "
-         "mapping, or function, from multi-indices of exact integers $i_0,\\ldots,i_{d-1}$ to Scheme values.  The set of multi-indices "
-         "$i_0,\\ldots,i_{d-1}$ that are valid for a given array form the "(<i>'domain)" of the array.  In this SRFI, each array's domain consists "
+         "mapping, or function, from multi-indices of exact integers $i_0,\\ldots,i_{d-1}$ to Scheme objects.  "
+         "(Programmatically, an abstract \" multi-index\" is the result of calling the Scheme procedure \""(<code>"values")"\", which can be called with zero or more arguments, i.e., "(<code>"(values)")", "(<code>"(values i_0)")", "(<code>"(values i_0 i_1)")", etc.)"
+         " The set of valid multi-indices "
+         "$i_0,\\ldots,i_{d-1}$ for a given array form the "(<i>'domain)" of the array.  In this SRFI, each array's domain consists "
          " of the cross product of intervals of exact integers $[l_0,u_0)\\times[l_1,u_1)\\times\\cdots\\times[l_{d-1},u_{d-1})$ of $\\mathbb Z^d$, $d$-tuples of "
          "integers.  Thus, we introduce a data type "
          "called $d$-"(<i> 'intervals)", or more briefly "(<a> href: "https://en.wikipedia.org/w/index.php?title=Interval_(mathematics)&oldid=1091935326" (<i>'intervals))", that encapsulates this notion. (We borrow this terminology from, e.g., "
@@ -136,12 +138,12 @@ MathJax.Hub.Config({
          )
         (<p> "This SRFI differs from the finalized " (<a> href: "https://srfi.schemers.org/srfi-231/" "SRFI 231")" in the following ways:")
         (<ul>
-         (<li> "The implementation no longer specifies, or implements, a difference between \"safe\" and \"unsafe\" arrays.  The getters and setters of all arrays made in the library check array indices for correctness; the setters of mutable specialized arrays check that the values they store into arrays are of the correct type.  (Internally, the sample implementation maintains \"unsafe\" setters and getters that are used in \"bulk\" array operations where the arguments are known to be appropriate.) So procedure arguments that specify whether array results are \"safe\" have been removed, as has the parameter "(<code> "specialized-array-default-safe?")".")
+         (<li> "The implementation no longer specifies, or implements, a difference between \"safe\" and \"unsafe\" arrays.  The getters and setters of all arrays made in the library check array indices for correctness; the setters of mutable specialized arrays check that the objects they store into arrays are of the correct type.  (Internally, the sample implementation maintains \"unsafe\" setters and getters that are used in \"bulk\" array operations where the arguments are known to be appropriate.) So procedure arguments that specify whether array results are \"safe\" have been removed, as has the parameter "(<code> "specialized-array-default-safe?")".")
          (<li> "The calling sequences for "(<a> href: "#interval-fold-left"(<code>'interval-fold-left))" and "(<a> href: "#interval-fold-right"(<code>'interval-fold-right))" have been changed.")
          (<li> (<code>'array-freeze!)" has been removed as a user-visible procedure.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly \"freeze\" a mutable array to make an immutable array.")
          (<li> "The default entry for arrays of generic-storage-class is now 0, not "(<code>'#f)", which we find to be more useful.")
          (<li> "The routines "(<code>'array-outer-product)" and "(<code>'array-inner-product)" are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure "(<code>'array-inner-product)" now returns a specialized, not a generalized, array result.")
-         (<li> "Both "(<a> href: "#explicit-array-broadcasting" "explicit")" and "(<a> href: "#implicit-array-broadcasting" "implicit")" array broadcasting are specified in this SRFI extension and in implemented in the sample implementation.")
+         (<li> "Both "(<a> href: "#explicit-array-broadcasting" "explicit")" and "(<a> href: "#implicit-array-broadcasting" "implicit")" array broadcasting are specified in this SRFI extension.")
          (<li> "The parameter "(<a> href: "#array-broadcasting?" "array-broadcasting?")" has been added to the SRFI.")
          (<li> "The routines "
                (<a> href: "#interval-every" (<code>'interval-every))", "
@@ -151,7 +153,7 @@ MathJax.Hub.Config({
                (<a> href: "#interval-insert-axis" (<code>'interval-insert-axis))", "
                (<a> href: "#object-rarrow-array" (<code>'object->array))", "
                (<a> href: "#array-insert-axis" (<code>'array-insert-axis))", "
-               (<a> href: "#compute-broadcast-interval" (<code>'compute-broadcast-interval))","
+               (<a> href: "#compute-broadcast-interval" (<code>'compute-broadcast-interval))", "
                (<a> href: "#array-broadcast" (<code>'array-broadcast))
                " have been added to the SRFI.")
          )
@@ -192,7 +194,7 @@ MathJax.Hub.Config({
         (<p> "The next few procedures set up operations to be executed in the future.  They build "(<i> "generalized")" arrays.")
         (<ul>
          (<li> (<a> href:"#array-map"(<code>'array-map))
-               ": Specifies an operation to be applied componentwise on arrays, so if "(<code>(<var>'A))" and "(<code>(<var>'B))" are matrices, "(<code>"(array-map + "(<var>'A)" "(<var>'B)")")" sets up a new generalized array that adds elements of the arrays componentwise.  You can chain these operations, so have "(<code>"(array-map + (array-map (lambda ("(<var>'x)") (* "(<var>"alpha x")")) "(<var>'A)") "(<var>'B)")")" without immediately computing and storing all the values of those arrays.")
+               ": Specifies an operation to be applied componentwise on arrays, so if "(<code>(<var>'A))" and "(<code>(<var>'B))" are matrices, "(<code>"(array-map + "(<var>'A)" "(<var>'B)")")" sets up a new generalized array that adds elements of the arrays componentwise.  You can chain these operations, so have "(<code>"(array-map + (array-map (lambda ("(<var>'x)") (* "(<var>"alpha x")")) "(<var>'A)") "(<var>'B)")")" without immediately computing and storing all the objects contained in those arrays.")
          (<li> (<a> href:"#array-outer-product"(<code>'array-outer-product))
                ": Applies an operation to all possible pairs of elements of two array arguments. Like considering an $m$-vector as a column vector and an $n$-vector as a row vector, and multiplying them together to compute an $m\\times n$ matrix.")
 
@@ -200,9 +202,9 @@ MathJax.Hub.Config({
         (<p> "Then, there are procedures that "(<i>'do)" generate all elements of an array and either store them somewhere, or combine them in some way:")
         (<ul>
          (<li> (<a> href:"#array-copy"(<code>'array-copy))
-               ": Evaluates the argument array at all valid indices and stores those values into a new specialized array.")
+               ": Evaluates the argument array at all valid indices and stores those objects into a new specialized array.")
          (<li> (<a> href:"#array-assign!"(<code>'array-assign!))
-               ": Evaluates the argument array at all valid indices and assigns their values to the elements of an existing array.  In the Gaussian Elimination example below, we combine "(<code>'array-map)", "(<code>'array-outer-product)", "(<code>'array-extract)", and "(<code>'array-assign!)" to do one step of the elimination.")
+               ": Evaluates the argument array at all valid indices and assigns the resulting objects to the elements of an existing array.  In the Gaussian Elimination example below, we combine "(<code>'array-map)", "(<code>'array-outer-product)", "(<code>'array-extract)", and "(<code>'array-assign!)" to do one step of the elimination.")
          (<li> (<a> href:"#array-stack"(<code>'array-stack))
                ": Like taking the individually rendered frames of an animated movie and combining them in time to make a complete video.  Can be considered a partial inverse to "(<code>'array-curry)".  Returns a specialized array.")
          (<li> (<a> href:"#array-decurry" (<code>'array-decurry))
@@ -266,9 +268,9 @@ MathJax.Hub.Config({
              "of "(<i>'any)" two affine maps is again affine.")
         (<h3> (<a> id: "extension" "Our extensions of Bawden-style arrays"))
         (<p> "We incorporate Bawden-style arrays into this SRFI, but extend them in one minor way that we find useful.")
-        (<p> "We introduce the notion of a "(<i>"storage class")", an object that contains procedures that manipulate, store, check, etc., different types of values. "
-             "The "(<code>'generic-storage-class)" can manipulate any Scheme value, "
-             "whereas, e.g., a "(<code>'u1-storage-class)" can store only the values 0 and 1 in each element of a body.")
+        (<p> "We introduce the notion of a "(<i>"storage class")", an object that contains procedures that manipulate, store, check, etc., different types of objects. "
+             "The "(<code>'generic-storage-class)" can manipulate any Scheme object, "
+             "whereas, e.g., a "(<code>'u1-storage-class)" can store only the exact integers 0 and 1 in each element of a body.")
         (<p> "We generally require that our affine maps be one-to-one, so that if $\\vec i\\neq\\vec j$ then $T(\\vec i)\\neq T(\\vec j)$.  Without this property, modifying "
              "the $\\vec i$th component of $A$ would cause the $\\vec j$th component to change.")
         (<h3> (<a> id: "transformations" "Common transformations on Bawden-style arrays"))
@@ -327,7 +329,7 @@ Thus, two things are necessary to specify an array: an interval and a mapping th
         (<p> "If this mapping can be changed, the array is said to be "(<i> 'mutable)", and the mutation is effected
 by the array's "(<i> 'setter)", accessed by the procedure "(<code>'array-setter)".  We call an object of this type a mutable array. Note: If an array does not have a setter, then we call it immutable even though the array's getter might not be a \"pure\" procedure, i.e., the value it returns may not depend solely on the arguments passed to the getter.")
         (<p> "In general, we leave the implementation of generalized arrays completely open.  They may be defined simply by closures, or
-they may have hash tables or databases behind an implementation, or may read the values from a file, etc.")
+they may have hash tables or databases behind an implementation, or may read the objects from a file, etc.")
         (<p> "In this SRFI, Bawden-style arrays are called "(<i> 'specialized)". A specialized array may be either mutable or immutable.")
 
         (<h3> (<a> id: "sharing" "Sharing generalized arrays"))
@@ -1055,7 +1057,7 @@ the representation of $[0,16)\\times [0,4)\\times[0,8)\\times[0,21)$.")
 
 (<h2> (<a> id: "Storage" "Storage classes"))
 (<p> "Conceptually, a storage-class is a set of procedures to manage the backing store of a specialized array.
-The procedures allow one to make a backing store, to get values from the store, to set new values, to return the length of the store, to specify a default value for initial elements of the backing store, to recognize which data can be converted to a backing store of this storage class, and to convert data to a backing store of this storage class.  Typically, a backing store is a (heterogeneous or homogeneous) vector.  A storage-class has a type distinct from other Scheme types.")
+The procedures allow one to make a backing store, to get objects from the store, to set new objects, to return the length of the store, to specify a default value for initial elements of the backing store, to recognize which data can be converted to a backing store of this storage class, and to convert data to a backing store of this storage class.  Typically, a backing store is a (heterogeneous or homogeneous) vector.  A storage-class has a type distinct from other Scheme types.")
 (<h3> (<a> id: "storageprocedures" "Procedures"))
 
 (format-lambda-list '(make-storage-class getter setter checker maker copier length default data? data->body))
