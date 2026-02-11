@@ -87,6 +87,7 @@ MathJax.Hub.Config({
         (<h2> "Contents")
         (<ul>
          (<li> (<a> href: "#Rationale" "Rationale"))
+         (<li> (<a> href: "#Terminology" "Terminology"))
          (<li> (<a> href: "#Overview" "Overview")
                (<ul>
                 (<li> (<a> href: "#Introductory" "Introductory remarks"))
@@ -157,6 +158,25 @@ MathJax.Hub.Config({
                (<a> href: "#array-broadcast" (<code>'array-broadcast))
                " have been added to the SRFI.")
          )
+
+        (<h2> (<a> id: "Terminology" "Terminology"))
+
+        (<p> "An "(<i>'index)" (plural: indices) is a Scheme exact integer.")
+        (<p> "A "(<i>'multi-index)" (plural: multi-indices) is a finite sequence of zero or more indices. "
+             "Multi-indices are not scheme objects, they are finite sequences of Scheme exact integers. "
+             "The number of indices in a multi-index is called its "(<i>'dimension)".  "
+             "There is only one zero-dimensional multi-index, which is a sequence of no indices at all, which we call the "(<i>"empty sequence")" or "(<i>"empty multi-index")".")
+        (<p> "A $d$-dimensional "(<i>'interval)", as defined here, is determined by a Scheme vector of "
+             (<i>"lower bounds")" $\\ell_0\\, \\ell_1\\ldots\\ell_{d-1}$, all indices, and a Scheme vector of "
+             (<i>"upper bounds")" $u_0\\,u_1\\ldots u_{d-1}$, again all indices, with $\\ell_k\\leq u_k$ for $k=0,\\ldots,d-1$. "
+             "This interval specifies a set of valid multi-indices "
+             "$i_0\\, i_1 \\ldots\\, i_{d-1}$ with $\\ell_k\\leq i_k<u_k$ for $k=0,\\ldots,d-1$. "
+             "If a multi-index $i_0\\, i_1 \\ldots\\, i_{d-1}$ is determined by an interval, we say that the interval "
+             (<i>'contains)" that multi-index. The number of multi-indices contained in an interval is that interval's "(<i>'volume)".")
+        (<p> "From these definitions, we see that if $\\ell_k=u_k$ for any $k$, then no multi-indices satisfy the condition to be contained in the interval, and we say that the interval is "(<i>'empty)", its volume is zero. If $d=0$, there is one and only multi-index contained in the interval, the empty multi-index, and that interval's volume is 1.")
+        (<p> "An "(<i>'array)" is determined by an interval, called its "(<i>'domain)" and a Scheme procedure, called the array's "(<i>'getter)" that takes a multi-index in that interval as arguments and returns a Scheme object. We call the Scheme objects returned by an array's getter the "(<i>'elements)" of that array.")
+        (<p> "A "(<i>"mutable array")"  has an additional Scheme procedure called the array's "(<i>'setter)" that takes as arguments a multi-index contained in its domain and a Scheme object and sets the array's element at that multi-index to the Scheme object given as an argument.")
+             
 
         (<h2> (<a> id: "Overview" "Overview"))
 

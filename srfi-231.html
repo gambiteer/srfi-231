@@ -23,6 +23,7 @@
     <h2>Contents</h2>
     <ul>
       <li><a href="#Rationale">Rationale</a></li>
+      <li><a href="#Terminology">Terminology</a></li>
       <li><a href="#Overview">Overview</a>
         <ul>
           <li><a href="#Introductory">Introductory remarks</a></li>
@@ -91,6 +92,13 @@
       <li>The parameter <a href="#array-broadcasting?">array-broadcasting?</a> has been added to the SRFI.</li>
       <li>The routines <a href="#interval-every"><code>interval-every</code></a>, <a href="#interval-any"><code>interval-any</code></a>, <a href="#interval-rebase"><code>interval-rebase</code></a>, <a href="#array-rebase"><code>array-rebase</code></a>, <a href="#interval-insert-axis"><code>interval-insert-axis</code></a>, <a href="#object-rarrow-array"><code>object-&gt;array</code></a>, <a href="#array-insert-axis"><code>array-insert-axis</code></a>, <a href="#compute-broadcast-interval"><code>compute-broadcast-interval</code></a>, <a href="#array-broadcast"><code>array-broadcast</code></a> have been added to the SRFI.</li>
     </ul>
+    <h2><a id="Terminology">Terminology</a></h2>
+    <p>An <i>index</i> (plural: indices) is a Scheme exact integer.</p>
+    <p>A <i>multi-index</i> (plural: multi-indices) is a finite sequence of zero or more indices. Multi-indices are not scheme objects, they are finite sequences of Scheme exact integers. The number of indices in a multi-index is called its <i>dimension</i>.  There is only one zero-dimensional multi-index, which is a sequence of no indices at all, which we call the <i>empty sequence</i> or <i>empty multi-index</i>.</p>
+    <p>A $d$-dimensional <i>interval</i>, as defined here, is determined by a Scheme vector of <i>lower bounds</i> $\ell_0\, \ell_1\ldots\ell_{d-1}$, all indices, and a Scheme vector of <i>upper bounds</i> $u_0\,u_1\ldots u_{d-1}$, again all indices, with $\ell_k\leq u_k$ for $k=0,\ldots,d-1$. This interval specifies a set of valid multi-indices $i_0\, i_1 \ldots\, i_{d-1}$ with $\ell_k\leq i_k&lt;u_k$ for $k=0,\ldots,d-1$. If a multi-index $i_0\, i_1 \ldots\, i_{d-1}$ is determined by an interval, we say that the interval <i>contains</i> that multi-index. The number of multi-indices contained in an interval is that interval's <i>volume</i>.</p>
+    <p>From these definitions, we see that if $\ell_k=u_k$ for any $k$, then no multi-indices satisfy the condition to be contained in the interval, and we say that the interval is <i>empty</i>, its volume is zero. If $d=0$, there is one and only multi-index contained in the interval, the empty multi-index, and that interval's volume is 1.</p>
+    <p>An <i>array</i> is determined by an interval, called its <i>domain</i> and a Scheme procedure, called the array's <i>getter</i> that takes a multi-index in that interval as arguments and returns a Scheme object. We call the Scheme objects returned by an array's getter the <i>elements</i> of that array.</p>
+    <p>A <i>mutable array</i>  has an additional Scheme procedure called the array's <i>setter</i> that takes as arguments a multi-index contained in its domain and a Scheme object and sets the array's element at that multi-index to the Scheme object given as an argument.</p>
     <h2><a id="Overview">Overview</a></h2>
     <h3><a id="Introductory">Introductory remarks</a></h3>
     <p>The next few sections talk perhaps too much about the mathematical ideas that underpin many of the procedures in this SRFI, so I discuss here some of the more commonly used procedures and compare them to operations on spreadsheets,  matrices, and imaging.</p>
