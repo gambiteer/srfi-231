@@ -75,7 +75,6 @@ MathJax.Hub.Config({
         (<p>
          "This SRFI specifies an array mechanism for Scheme. Arrays as defined here are quite general; at their most basic, an array is simply a "
          "mapping, or function, from multi-indices of exact integers $i_0,\\ldots,i_{d-1}$ to Scheme objects.  "
-         "(Programmatically, an abstract \" multi-index\" is the result of calling the Scheme procedure \""(<code>"values")"\", which can be called with zero or more arguments, i.e., "(<code>"(values)")", "(<code>"(values i_0)")", "(<code>"(values i_0 i_1)")", etc.)"
          " The set of valid multi-indices "
          "$i_0,\\ldots,i_{d-1}$ for a given array form the "(<i>'domain)" of the array.  In this SRFI, each array's domain consists "
          " of the cross product of intervals of exact integers $[l_0,u_0)\\times[l_1,u_1)\\times\\cdots\\times[l_{d-1},u_{d-1})$ of $\\mathbb Z^d$, $d$-tuples of "
@@ -163,18 +162,21 @@ MathJax.Hub.Config({
 
         (<p> "An "(<i>'index)" (plural: indices) is a Scheme exact integer.")
         (<p> "A "(<i>'multi-index)" (plural: multi-indices) is a finite sequence of zero or more indices. "
-             "Multi-indices are not scheme objects, they are finite sequences of Scheme exact integers. "
+             "While not a Scheme object per se, the sequence of indices making up a multi-index may be returned by the "
+             (<code>'values)" procedure in Scheme. (See, for example, the "(<cv>'new-domain->old-domain)" procedure argument to "
+             (<a> href: "#specialized-array-share" (<code>'specialized-array-share))".) "
              "The number of indices in a multi-index is called its "(<i>'dimension)".  "
-             "There is only one zero-dimensional multi-index, which is a sequence of no indices at all, which we call the "(<i>"empty sequence")" or "(<i>"empty multi-index")".")
-        (<p> "A $d$-dimensional "(<i>'interval)", as defined here, is determined by a Scheme vector of "
-             (<i>"lower bounds")" $\\ell_0\\, \\ell_1\\ldots\\ell_{d-1}$, all indices, and a Scheme vector of "
+             "There is only one zero-dimensional multi-index, which is a sequence of no indices at all, which we call the "(<i>"empty multi-index")".")
+        (<p> "A $d$-dimensional "(<i>'interval)" is determined by Scheme vectors of "
+             (<i>"lower bounds")" $\\ell_0\\, \\ell_1\\ldots\\ell_{d-1}$, all indices, and "
              (<i>"upper bounds")" $u_0\\,u_1\\ldots u_{d-1}$, again all indices, with $\\ell_k\\leq u_k$ for $k=0,\\ldots,d-1$. "
-             "This interval specifies a set of valid multi-indices "
-             "$i_0\\, i_1 \\ldots\\, i_{d-1}$ with $\\ell_k\\leq i_k<u_k$ for $k=0,\\ldots,d-1$. "
-             "If a multi-index $i_0\\, i_1 \\ldots\\, i_{d-1}$ is determined by an interval, we say that the interval "
+             "All multi-indices "
+             "$i_0\\, i_1 \\ldots\\, i_{d-1}$ with $\\ell_k\\leq i_k<u_k$ for $k=0,\\ldots,d-1$ are said to be "(<i>'valid)
+             " for that interval. "
+             "If a multi-index $i_0\\, i_1 \\ldots\\, i_{d-1}$ is valid for an interval, we say that the interval "
              (<i>'contains)" that multi-index. The number of multi-indices contained in an interval is that interval's "(<i>'volume)".")
-        (<p> "From these definitions, we see that if $\\ell_k=u_k$ for any $k$, then no multi-indices satisfy the condition to be contained in the interval, and we say that the interval is "(<i>'empty)", its volume is zero. If $d=0$, there is one and only multi-index contained in the interval, the empty multi-index, and that interval's volume is 1.")
-        (<p> "An "(<i>'array)" is determined by an interval, called its "(<i>'domain)" and a Scheme procedure, called the array's "(<i>'getter)" that takes a multi-index in that interval as arguments and returns a Scheme object. We call the Scheme objects returned by an array's getter the "(<i>'elements)" of that array.")
+        (<p> "From these definitions, we see that if $\\ell_k=u_k$ for any $k$, then no multi-index satisfies the condition to be contained in the interval, and we say that the interval is "(<i>'empty)", its volume is zero. If $d=0$, there is one and only one multi-index contained in the interval, the empty multi-index, and that interval's volume is 1.")
+        (<p> "An "(<i>'array)" is determined by an interval, called its "(<i>'domain)", and a Scheme procedure, called the array's "(<i>'getter)" that takes a multi-index in that interval as arguments and returns a Scheme object. We call the Scheme objects returned by an array's getter the "(<i>'elements)" of that array.")
         (<p> "A "(<i>"mutable array")"  has an additional Scheme procedure called the array's "(<i>'setter)" that takes as arguments a multi-index contained in its domain and a Scheme object and sets the array's element at that multi-index to the Scheme object given as an argument.")
              
 
@@ -404,8 +406,6 @@ So we had to make some decisions about how to broadcast generalized arrays and a
 
         (<h2> (<a> id: "Notes" "Notes"))
         (<ul>
-         (<li> (<b> "Empty and zero-dimensional arrays: ")"The vectors of upper and lower bounds of an interval can have zero elements, in which case the zero-dimensional interval has a single element, a zero-length multi-index, i.e., "(<code>"(values)")". Zero-dimensional arrays with this domain have getters and setters that take zero indices as arguments and that return or set a single element, much like a Scheme "(<code>'box)".")
-         (<p> "If an interval has at least one upper and lower bound, and at least one of these upper bounds equals the associated lower bound, then that interval is empty, and arrays with empty intervals as domains have getters and setters that should raise an exception when called.")
          (<li> (<b> "This SRFI and "(<code>'call-with-current-continuation)": ")"The Scheme procedure "(<code>'call-with-current-continuation)" captures and encapsulates as a procedure the continuation of the current computation, which, perforce, includes a certain amount of state that consists of the environment of captured variables at the point the continuation is captured. This captured procedure can be invoked multiple times, as any procedure can."
                (<p>
                 "No procedure in the sample implementation calls "(<code>'call-with-current-continuation)", but the procedural arguments to, e.g., "(<code>'make-array)", "(<code>'specialized-array-share)", "(<code>'array-map)", etc., may themselves call "(<code>'call-with-current-continuation)".")
