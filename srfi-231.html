@@ -637,18 +637,19 @@
          (A! (array-setter A)))
     (do ((i 2 (+ i 1)))
         ((&gt; i sqrt-n)
-         (interval-fold-right (lambda (A_i result)
-                                (if (eqv? A_i 1)
+         (interval-fold-right (lambda (i result)
+                                (if (eqv? (A_ i) 1)
                                     (cons i result)
                                     result))
                               '()
                               (array-domain A)
-                              A_))
+                              values))
       (if (eqv? (A_ i) 1)
           (do ((j (square i) (+ j i)))
               ((&gt; j n))
             (A! 0 j))))))
 
+(eratosthenes 10) =&gt; (2 3 5 7)
 (length (eratosthenes 1000000)) =&gt; 78498</code></pre>
     <p><b>Procedure: </b><code><a id="interval-every">interval-every</a> <var>f</var> <var>interval</var></code></p>
     <p><b>Procedure: </b><code><a id="interval-any">interval-any</a> <var>f</var> <var>interval</var></code></p>
