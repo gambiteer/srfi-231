@@ -5638,8 +5638,7 @@ that computes the componentwise products when we need them, the times are
               (A_ i i))
              (column/row-domain
               ;; both will be one-dimensional
-              (make-interval (vector (+ i 1))
-                             (vector n)))
+              (make-interval `#((,(+ i 1) ,n))))
              (column
               ;; the column below the (i,i) entry
               (specialized-array-share A
@@ -5657,9 +5656,8 @@ that computes the componentwise products when we need them, the times are
              ;;below the (i,i) entry
              (subarray
               (array-extract
-               A (make-interval
-                  (vector (fx+ i 1) (fx+ i 1))
-                  (vector n         n)))))
+               A (interval-cartesian-product column/row-domain
+                                             column/row-domain))))
         ;; compute multipliers
         (array-assign!
          column
@@ -6305,20 +6303,21 @@ that computes the componentwise products when we need them, the times are
                     A-reconstructed!)
           #t)))
 
-(let* ((a (make-array (make-interval '#(4 6)) list))
-       (k 2)
-       (m (interval-upper-bound (array-domain a) 0))
-       (n (interval-upper-bound (array-domain a) 1)))
-  (pretty-print
-   (array->list* a))
-  (newline)
-  (pretty-print
-   (array->list*
+(define (move-row-to-top a k)
+  ;; Move the k'th row of the two-dimensional spreadsheet a to the top
+  (let ((m (interval-upper-bound (array-domain a) 0))
+        (n (interval-upper-bound (array-domain a) 1)))
     (array-append
      0
-     (list (array-extract a (make-interval (vector k 0) (vector (+ k 1) n)))
-           (array-extract a (make-interval (vector k n)))
-           (array-extract a (make-interval (vector (+ k 1) 0) (vector m n))))))))
+     (list (array-extract a (make-interval `#((,k ,(+ k 1)) ,n)))
+           (array-extract a (make-interval `#(,k ,n)))
+           (array-extract a (make-interval `#((,(+ k 1) ,m) ,n)))))))
+
+
+(let* ((a (make-array (make-interval '#(4 6)) list)))
+  (pretty-print (array->list* a))
+  (newline)
+  (pretty-print (array->list* (move-row-to-top a 2))))
 
 (next-test-random-source-state!)
 

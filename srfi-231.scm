@@ -181,7 +181,7 @@ MathJax.Hub.Config({
         (<p> "From these definitions, we see that if $\\ell_k=u_k$ for any $k$, then no multi-index satisfies the condition to be contained in the interval, and we say that the interval is "(<i>'empty)", its volume is zero. If $d=0$, there is one and only one multi-index contained in the interval, the empty multi-index, and that interval's volume is 1.")
         (<p> "An "(<i>'array)" is determined by an interval, called its "(<i>'domain)", and a Scheme procedure, called the array's "(<i>'getter)" that takes a multi-index in that interval as arguments and returns a Scheme object. We call the Scheme objects returned by an array's getter the "(<i>'elements)" of that array.")
         (<p> "A "(<i>"mutable array")"  has an additional Scheme procedure called the array's "(<i>'setter)" that takes as arguments a multi-index contained in its domain and a Scheme object and sets the array's element at that multi-index to the Scheme object given as an argument.")
-             
+
 
         (<h2> (<a> id: "Overview" "Overview"))
 
@@ -3199,20 +3199,20 @@ A after assignment:
 (<p> "It is an error if the arguments do not satisfy these constraints.")
 (<p>(<b>"Example:")" Given a two-dimensional array $a$ interpreted as a spreadsheet, with the rows and columns indexed starting at 0, one might want to make a new array with row $k$ moved to be the top row.  Then one could do:")
 (<pre>(<code>
-"(let* ((a (make-array (make-interval '#(4 6)) list))
-       (k 2)
-       (m (interval-upper-bound (array-domain a) 0))
-       (n (interval-upper-bound (array-domain a) 1)))
-  (pretty-print
-   (array->list* a))
-  (newline)
-  (pretty-print
-   (array->list*
+"(define (move-row-to-top a k)
+  ;; Move the k'th row of the two-dimensional spreadsheet a to the top
+  (let ((m (interval-upper-bound (array-domain a) 0))
+        (n (interval-upper-bound (array-domain a) 1)))
     (array-append
      0
-     (list (array-extract a (make-interval (vector k 0) (vector (+ k 1) n)))
-           (array-extract a (make-interval (vector k n)))
-           (array-extract a (make-interval (vector (+ k 1) 0) (vector m n))))))))"))
+     (list (array-extract a (make-interval `#((,k ,(+ k 1)) ,n)))
+           (array-extract a (make-interval `#(,k ,n)))
+           (array-extract a (make-interval `#((,(+ k 1) ,m) ,n)))))))
+
+(let* ((a (make-array (make-interval '#(4 6)) list)))
+  (pretty-print (array->list* a))
+  (newline)
+  (pretty-print (array->list* (move-row-to-top a 2))))"))
 (<p> "This prints:")
 (<pre>(<code>"(((0 0) (0 1) (0 2) (0 3) (0 4) (0 5))
  ((1 0) (1 1) (1 2) (1 3) (1 4) (1 5))
@@ -4245,8 +4245,7 @@ The code uses "(<code>'array-map)", "(<code>'array-assign!)", "(<code>'specializ
               (A_ i i))
              (column/row-domain
               ;; both will be one-dimensional
-              (make-interval (vector (+ i 1))
-                             (vector n)))
+              (make-interval `#((,(+ i 1) ,n))))
              (column
               ;; the column below the (i,i) entry
               (specialized-array-share A
@@ -4264,9 +4263,8 @@ The code uses "(<code>'array-map)", "(<code>'array-assign!)", "(<code>'specializ
              ;; below the (i,i) entry
              (subarray
               (array-extract
-               A (make-interval
-                  (vector (fx+ i 1) (fx+ i 1))
-                  (vector n         n)))))
+               A (interval-cartesian-product column/row-domain
+                                             column/row-domain))))
         ;; Compute multipliers.
         (array-assign!
          column
