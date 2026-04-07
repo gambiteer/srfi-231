@@ -3,6 +3,7 @@
     ;; Miscellaneous Functions
     translation?
     permutation?
+    interval-specifier?
     index-rotate
     index-first
     index-last
@@ -10,6 +11,7 @@
 
     ;; Intervals
     make-interval
+    interval->specifier
     interval?
     interval-dimension
     interval-lower-bound interval-upper-bound interval-width

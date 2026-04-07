@@ -89,8 +89,9 @@
       <li>The default entry for arrays of generic-storage-class is now 0, not <code>#f</code>, which we find to be more useful.</li>
       <li>The routines <code>array-outer-product</code> and <code>array-inner-product</code> are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure <code>array-inner-product</code> now returns a specialized, not a generalized, array result.</li>
       <li>Both <a href="#explicit-array-broadcasting">explicit</a> and <a href="#implicit-array-broadcasting">implicit</a> array broadcasting are specified in this SRFI extension.</li>
+      <li>This document introduces <a href="#interval-specifier">interval specifiers</a> to allow specifying intervals more succinctly.</li>
       <li>The parameter <a href="#array-broadcasting?">array-broadcasting?</a> has been added to the SRFI.</li>
-      <li>The routines <a href="#interval-every"><code>interval-every</code></a>, <a href="#interval-any"><code>interval-any</code></a>, <a href="#interval-rebase"><code>interval-rebase</code></a>, <a href="#array-rebase"><code>array-rebase</code></a>, <a href="#interval-insert-axis"><code>interval-insert-axis</code></a>, <a href="#object-rarrow-array"><code>object-&gt;array</code></a>, <a href="#array-insert-axis"><code>array-insert-axis</code></a>, <a href="#compute-broadcast-interval"><code>compute-broadcast-interval</code></a>, <a href="#array-broadcast"><code>array-broadcast</code></a> have been added to the SRFI.</li>
+      <li>The routines <a href="#interval-specifier?"><code>interval-specifier?</code></a>, <a href="#interval-rarrow-specifier"><code>interval-&gt;specifier?</code></a>, <a href="#interval-every"><code>interval-every</code></a>, <a href="#interval-any"><code>interval-any</code></a>, <a href="#interval-rebase"><code>interval-rebase</code></a>, <a href="#array-rebase"><code>array-rebase</code></a>, <a href="#interval-insert-axis"><code>interval-insert-axis</code></a>, <a href="#object-rarrow-array"><code>object-&gt;array</code></a>, <a href="#array-insert-axis"><code>array-insert-axis</code></a>, <a href="#compute-broadcast-interval"><code>compute-broadcast-interval</code></a>, <a href="#array-broadcast"><code>array-broadcast</code></a> have been added to the SRFI.</li>
     </ul>
     <h2><a id="Terminology">Terminology</a></h2>
     <p>An <i>index</i> (plural: indices) is a Scheme exact integer.</p>
@@ -230,12 +231,14 @@
       <dt>Miscellaneous Procedures</dt>
       <dd><a href="#translation?">translation?</a>,
         <a href="#permutation?">permutation?</a>,
+        <a href="#interval-specifier?">interval-specifier?</a>,
         <a href="#index-rotate">index-rotate</a>,
         <a href="#index-first">index-first</a>,
         <a href="#index-last">index-last</a>,
         <a href="#index-swap">index-swap</a>.</dd>
       <dt>Intervals</dt>
       <dd><a href="#make-interval">make-interval</a>,
+        <a href="#interval-rarrow-specifier">interval-&gt;specifier</a>,
         <a href="#interval?">interval?</a>,
         <a href="#interval-dimension">interval-dimension</a>,
         <a href="#interval-lower-bound">interval-lower-bound</a>,
@@ -359,15 +362,17 @@
     <h2><a id="Preliminary">Preliminary notes</a></h2>
     <p>We use <code>take</code> and <code>drop</code> from <a href="https://srfi.schemers.org/srfi-1/srfi-1.html">SRFI 1</a> to define various procedures.</p>
     <h2><a id="Miscellaneous">Miscellaneous procedures</a></h2>
-    <p>This document refers to <i>translations</i> and <i>permutations</i>.
+    <p>This document refers to <i>translations</i>, <i>permutations</i>, and <i>interval specifiers</i>.
        A translation is a vector of exact integers.  A permutation of dimension $n$
-      is a vector whose entries are the exact integers $0,1,\ldots,n-1$, each occurring once, in any order.
-      We provide four procedures that return useful permutations.</p>
+      is a vector whose entries are the exact integers $0,1,\ldots,n-1$, each occurring once, in any order.  <a id="interval-specifier">An interval specifier is a vector, each entry of which is either a nonnegative exact integer $u$ or a list of two exact integers $\ell$ and $u$ with $\ell\leq u$.</a></p>
+    <p>We also provide four procedures that return useful permutations.</p>
     <h3><a id="miscprocedures">Procedures</a></h3>
     <p><b>Procedure: </b><code><a id="translation?">translation?</a> <var>object</var></code></p>
     <p>Returns <code>#t</code> if <code><var>object</var></code> is a translation, and <code>#f</code> otherwise.</p>
     <p><b>Procedure: </b><code><a id="permutation?">permutation?</a> <var>object</var></code></p>
     <p>Returns <code>#t</code> if <code><var>object</var></code> is a permutation, and <code>#f</code> otherwise.</p>
+    <p><b>Procedure: </b><code><a id="interval-specifier?">interval-specifier?</a> <var>object</var></code></p>
+    <p>Returns <code>#t</code> if <code><var>object</var></code> is an interval specifier, and <code>#f</code> otherwise.</p>
     <p><b>Procedure: </b><code><a id="index-rotate">index-rotate</a> <var>n</var> <var>k</var></code></p>
     <p>Assumes that <var>n</var> is a nonnegative exact integer and that <var>k</var> is an exact integer between 0 and <var>n</var> (inclusive).   Returns a permutation that rotates <var>n</var> indices <var>k</var> places to the left:</p>
     <pre><code>(define (index-rotate n k)
@@ -408,18 +413,22 @@
     <p>If $l_k=u_k$ for some $k$ then the interval is <i>empty</i>; if $d=0$ then the interval is <i>zero-dimensional</i>.  So rather than mathematical objects, it is perhaps better to think of intervals as pairs of vectors $L$ and $U$ for which $L_k\leq U_k$; $L$ or $U$ could be empty (hence $d=0$).</p>
     <p>Intervals are a data type distinct from other Scheme data types.</p>
     <h3><a id="intervalprocedures">Procedures</a></h3>
-    <p><b>Procedure: </b><code><a id="make-interval">make-interval</a> <var>arg1</var> [ <var>arg2</var> ]</code></p>
-    <p>Create a new interval. Assumes that <code><var>arg1</var></code> and <code><var>arg2</var></code> (if given) are vectors (of the same length) of exact integers.</p>
-    <p>If <code><var>arg2</var></code> is not given, then the entries of <code><var>arg1</var></code>, if any, must be nonnegative, and they are taken as the <code><var>upper-bounds</var></code> of the interval, and  <code><var>lower-bounds</var></code> is set to a vector of the same length with exact zero entries.</p>
-    <p>If <code><var>arg2</var></code> is given, then <code><var>arg1</var></code> is taken to be <code><var>lower-bounds</var></code> and <code><var>arg2</var></code> is taken to be <code><var>upper-bounds</var></code>, which must satisfy</p>
-    <pre><code>(&lt;= (vector-ref <var>lower-bounds</var> i) (vector-ref <var>upper-bounds</var> i))</code></pre>
-    <p> for
-      $0\leq i&lt;{}$<code>(vector-length <var>lower-bounds</var>)</code>.  It is an error if
-      <code><var>lower-bounds</var></code> and <code><var>upper-bounds</var></code> do not satisfy these conditions.</p>
+    <p><b>Procedure: </b><code><a id="make-interval">make-interval</a> <var>specifier</var></code></p>
+    <p><b>Procedure: </b><code><a id="make-interval">make-interval</a> <var>lowers</var> <var>uppers</var></code></p>
+    <p>Creates an interval.</p>
+    <p>When given one argument, assumes that <code><var>specifier</var></code> is an <a href="#interval-specifier">interval specifier</a>, that is, a vector each of whose elements is either a nonnegative exact integer $u$ or a list of two exact integers $\ell$ and $u$ with $\ell\leq u$. In this case <code>make-interval</code> returns an interval of dimension <code>(vector-length <var>specifier</var>)</code> with the following properties: If the $i$th entry of <code><var>specifier</var></code> is a list of nonnegative exact integers $\ell$ and $u$ with $\ell\leq u$, then the $i$th lower bound of the result is $\ell$ and the $i$th upper bound of the result is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.</p>
+    <p>When given two arguments, assumes that <code><var>lowers</var></code> and <code><var>uppers</var></code> are vectors of the same length, each containing exact integers with <code>(&lt;= (vector-ref <var>lowers</var> i) (vector-ref <var>uppers</var> i))</code> for all <code>i</code>. In this case <code>make-interval</code> returns an interval with lower bounds <code><var>lowers</var></code> and upper bounds <code><var>uppers</var></code>.</p>
+    <p>It is an error of the arguments do not satisfy these assumptions.</p>
     <p><b>Example: </b></p>
-    <pre><code>(let ((A (make-interval '#(3 4)))
-      (B (make-interval '#(0 0) '#(3 4))))
+    <pre><code>(let ((A (make-interval '#(3 (1 4))))
+      (B (make-interval '#(0 1) '#(3 4))))
   (interval= A B))   ;; =&gt; #t</code></pre>
+    <p><b>Procedure: </b><code><a id="interval-rarrow-specifier">interval-&gt;specifier</a> <var>interval</var></code></p>
+    <p>Assumes that the argument <code><var>interval</var></code> is an interval.  Returns an <a href="#interval-specifier">interval specifier</a> from which <code>make-interval</code> can recreate the argument.  It is an error if <code><var>interval</var></code> is not an interval.</p>
+    <p><b>Example: </b>
+      <pre><code>
+(let ((A (make-interval '#(0 1 0) '#(3 8 2))))
+  (pretty-print (interval-&gt;specifier A))) ;; =&gt; #(3 (1 8) 2)</code></pre></p>
     <p><b>Procedure: </b><code><a id="interval?">interval?</a> <var>object</var></code></p>
     <p>Returns <code>#t</code> if <code><var>object</var></code> is an interval, and <code>#f</code> otherwise.</p>
     <p><b>Example: </b></p>

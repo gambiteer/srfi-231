@@ -225,7 +225,83 @@ OTHER DEALINGS IN THE SOFTWARE.
   (apply string-append (number->string (car l))
          (map (lambda (n) (string-append "_" (number->string n))) (cdr l))))
 
-;; (include "generic-arrays.scm")
+(pp "Interval specifier tests")
+
+(test (interval-specifier? 'a) #f)
+(test (interval-specifier? '#(a)) #f)
+(test (interval-specifier? '#(-1)) #f)
+(test (interval-specifier? '#(1 a)) #f)
+(test (interval-specifier? '#((1 a))) #f)
+(test (interval-specifier? '#(1 (1 a))) #f)
+(test (interval-specifier? '#(1 (1 -2))) #f)
+(test (interval-specifier? '#(1 (1 2 3))) #f)
+
+(test (interval->specifier 'a)
+      "interval->specifier: The argument is not an interval: ")
+
+(test (make-interval 'a)
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#(a))
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#(-1))
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#(1 a))
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#((1 a)))
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#(1 (1 a)))
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#(1 (1 -2)))
+      "make-interval: The argument is not an interval specifier: ")
+(test (make-interval '#(1 (1 2 3)))
+      "make-interval: The argument is not an interval specifier: ")
+
+(define (my-specifier->interval specifier)
+  (let* ((n (vector-length specifier))
+         (lowers (make-vector n))
+         (uppers (make-vector n)))
+    (do ((i 0 (+ i 1)))
+        ((= i n) (make-interval lowers uppers))
+      (let ((entry (vector-ref specifier i)))
+        (if (pair? entry)
+            (begin
+              (vector-set! lowers i (car entry))
+              (vector-set! uppers i (cadr entry)))
+            (begin
+              (vector-set! lowers i 0)
+              (vector-set! uppers i entry)))))))
+
+(define (my-interval->specifier interval)
+  (vector-map (lambda (lower upper)
+                (if (zero? lower)
+                    upper
+                    (list lower upper)))
+              (interval-lower-bounds->vector interval)
+              (interval-upper-bounds->vector interval)))
+
+(define (random-specifier #!optional (min 0) (max 6))
+  (let* ((result (make-vector (random min max)))
+         (n (vector-length result)))
+    (do ((i 0 (+ i 1)))
+        ((= i n) result)
+      (let* ((lower (random -2 3))
+             (upper (+ lower (random 0 4))))
+        (if (zero? lower)
+            upper
+            (list lower upper))))))
+
+(do ((i 0 (+ i 1)))
+    ((= i random-tests))
+  (let* ((specifier (random-specifier))
+         (interval (make-interval specifier)))
+    (test (interval-specifier? specifier) #t)
+    (test (my-specifier->interval specifier) interval)
+    (test specifier (interval->specifier interval))
+    (test (make-interval (interval-lower-bounds->vector interval)
+                         (interval-upper-bounds->vector interval))
+          interval)))
+
+(next-test-random-source-state!)
 
 (pp "Interval error tests")
 
@@ -260,27 +336,19 @@ OTHER DEALINGS IN THE SOFTWARE.
       0)
 
 (test (make-interval 1)
-      "make-interval: The argument is not a vector of nonnegative exact integers: ")
+      "make-interval: The argument is not an interval specifier: ")
 
 (test (interval-volume (make-interval '#()))
       1)
 
 (test (make-interval '#(1.))
-      "make-interval: The argument is not a vector of nonnegative exact integers: ")
+      "make-interval: The argument is not an interval specifier: ")
 
 (test (make-interval '#(-1))
-      "make-interval: The argument is not a vector of nonnegative exact integers: ")
+      "make-interval: The argument is not an interval specifier: ")
 
 (test (make-interval '#(1) '#(0))
       "make-interval: Each lower-bound must be no greater than the associated upper-bound: ")
-
-(pp "interval result tests")
-
-(test (make-interval '#(11111)  '#(11112))
-      (make-interval '#(11111) '#(11112)))
-
-(test (make-interval '#(1 2 3)  '#(4 5 6))
-      (make-interval '#(1 2 3) '#(4 5 6)))
 
 (pp "interval? result tests")
 

@@ -32,11 +32,43 @@
 
 (define interval? %%interval?)
 
+(define (interval-specifier? obj)
+  (and (vector? obj)
+       (vector-every (lambda (entry)
+                       (or (and (exact-integer? entry)
+                                (not (negative? entry)))
+                           (and (pair? entry)
+                                (pair? (cdr entry))
+                                (null? (cddr entry))
+                                (exact-integer? (car entry))
+                                (exact-integer? (cadr entry))
+                                (<= (car entry) (cadr entry)))))
+                     obj)))
+
+(define (interval->specifier interval)
+  (vector-map (lambda (lower upper)
+                (if (eqv? lower 0)
+                    upper
+                    (list lower upper)))
+              (%%interval-lower-bounds interval)
+              (%%interval-upper-bounds  interval)))
+
 (define make-interval
   (case-lambda
-   ((upper-bounds)
-    (make-%%interval (make-vector (vector-length upper-bounds) 0)
-                     (vector-copy upper-bounds)))
+   ((specifier)
+    (let* ((n (vector-length specifier))
+             (lowers (make-vector n))
+             (uppers (make-vector n)))
+        (do ((i 0 (fx+ i 1)))
+            ((fx= i n)
+             (make-%%interval lowers uppers))
+          (let ((entry (vector-ref specifier i)))
+            (cond ((pair? entry)
+                   (vector-set! lowers i (car entry))
+                   (vector-set! uppers i (cadr entry)))
+                  (else
+                   (vector-set! lowers i 0)
+                   (vector-set! uppers i entry)))))))
    ((lower-bounds upper-bounds)
     (make-%%interval (vector-copy lower-bounds)
                      (vector-copy upper-bounds)))))

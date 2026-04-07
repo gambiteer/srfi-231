@@ -144,8 +144,11 @@ MathJax.Hub.Config({
          (<li> "The default entry for arrays of generic-storage-class is now 0, not "(<code>'#f)", which we find to be more useful.")
          (<li> "The routines "(<code>'array-outer-product)" and "(<code>'array-inner-product)" are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure "(<code>'array-inner-product)" now returns a specialized, not a generalized, array result.")
          (<li> "Both "(<a> href: "#explicit-array-broadcasting" "explicit")" and "(<a> href: "#implicit-array-broadcasting" "implicit")" array broadcasting are specified in this SRFI extension.")
+         (<li> "This document introduces "(<a> href: "#interval-specifier" "interval specifiers")" to allow specifying intervals more succinctly.")
          (<li> "The parameter "(<a> href: "#array-broadcasting?" "array-broadcasting?")" has been added to the SRFI.")
          (<li> "The routines "
+               (<a> href: "#interval-specifier?" (<code>'interval-specifier?))", "
+               (<a> href: "#interval-rarrow-specifier" (<code>'interval->specifier?))", "
                (<a> href: "#interval-every" (<code>'interval-every))", "
                (<a> href: "#interval-any" (<code>'interval-any))", "
                (<a> href: "#interval-rebase" (<code>'interval-rebase))", "
@@ -435,6 +438,7 @@ So we had to make some decisions about how to broadcast generalized arrays and a
            (<dt> "Miscellaneous Procedures")
            (<dd> (<a> href: "#translation?" "translation?") END
                  (<a> href: "#permutation?" "permutation?") END
+                 (<a> href: "#interval-specifier?" "interval-specifier?") END
                  (<a> href: "#index-rotate" "index-rotate") END
                  (<a> href: "#index-first" "index-first") END
                  (<a> href: "#index-last" "index-last") END
@@ -442,6 +446,7 @@ So we had to make some decisions about how to broadcast generalized arrays and a
                  ".")
            (<dt> "Intervals")
            (<dd> (<a> href: "#make-interval" "make-interval")END
+                 (<a> href: "#interval-rarrow-specifier" "interval->specifier") END
                  (<a> href: "#interval?" "interval?")END
                  (<a> href: "#interval-dimension" "interval-dimension")END
                  (<a> href: "#interval-lower-bound" "interval-lower-bound")END
@@ -569,15 +574,17 @@ So we had to make some decisions about how to broadcast generalized arrays and a
         (<h2> (<a> id: "Preliminary" "Preliminary notes"))
         (<p> "We use "(<code>'take)" and "(<code>'drop)" from "(<a> href: "https://srfi.schemers.org/srfi-1/srfi-1.html" "SRFI 1")" to define various procedures.")
         (<h2> (<a> id: "Miscellaneous" "Miscellaneous procedures"))
-        (<p> "This document refers to "(<i> 'translations)" and "(<i> 'permutations)".
+        (<p> "This document refers to "(<i> 'translations)", "(<i> 'permutations)", and "(<i>"interval specifiers")".
  A translation is a vector of exact integers.  A permutation of dimension $n$
-is a vector whose entries are the exact integers $0,1,\\ldots,n-1$, each occurring once, in any order.
-We provide four procedures that return useful permutations.")
+is a vector whose entries are the exact integers $0,1,\\ldots,n-1$, each occurring once, in any order.  "(<a> id: "interval-specifier" "An interval specifier is a vector, each entry of which is either a nonnegative exact integer $u$ or a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$."))
+        (<p> "We also provide four procedures that return useful permutations.")
         (<h3> (<a> id: "miscprocedures" "Procedures"))
         (format-lambda-list '(translation? object))
         (<p> "Returns "(<code> '#t)" if "(<code>(<var>'object))" is a translation, and "(<code> '#f)" otherwise.")
         (format-lambda-list '(permutation? object))
         (<p> "Returns "(<code> '#t)" if "(<code>(<var>'object))" is a permutation, and "(<code> '#f)" otherwise.")
+        (format-lambda-list '(interval-specifier? object))
+        (<p> "Returns "(<code> '#t)" if "(<code>(<var>'object))" is an interval specifier, and "(<code> '#f)" otherwise.")
         (format-lambda-list '(index-rotate n k))
         (<p> "Assumes that "(<var>'n)" is a nonnegative exact integer and that "(<var>'k)" is an exact integer between 0 and "(<var>'n)" (inclusive).   Returns a permutation that rotates "(<var>'n)" indices "(<var>'k)" places to the left:")
         (<pre>(<code>
@@ -623,18 +630,22 @@ of the interval.")
         (<p> "Intervals are a data type distinct from other Scheme data types.")
 
         (<h3> (<a> id: "intervalprocedures" "Procedures"))
-        (format-lambda-list '(make-interval arg1 #\[ arg2 #\]))
-        (<p> "Create a new interval. Assumes that "(<code> (<var>"arg1"))" and "(<code> (<var>"arg2"))" (if given) are vectors (of the same length) of exact integers.")
-        (<p> "If "(<code> (<var>"arg2"))" is not given, then the entries of "(<code> (<var>"arg1"))", if any, must be nonnegative, and they are taken as the "(<code>(<var>"upper-bounds"))" of the interval, and  "(<code> (<var>"lower-bounds"))" is set to a vector of the same length with exact zero entries.")
-        (<p> "If "(<code> (<var>"arg2"))" is given, then "(<code> (<var>"arg1"))" is taken to be "(<code> (<var>"lower-bounds"))" and "(<code> (<var>"arg2"))" is taken to be "(<code> (<var>"upper-bounds"))", which must satisfy")
-        (<pre>
-         (<code>"(<= (vector-ref "(<var>"lower-bounds")" i) (vector-ref "(<var>"upper-bounds")" i))"))
-        (<p> " for
-$0\\leq i<{}$"(<code>"(vector-length "(<var>"lower-bounds")")")".  It is an error if
-"(<code>(<var>"lower-bounds"))" and "(<code>(<var>"upper-bounds"))" do not satisfy these conditions.")
-        (<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(3 4)))
-      (B (make-interval '#(0 0) '#(3 4))))
+        (format-lambda-list '(make-interval specifier))
+        (format-lambda-list '(make-interval lowers uppers))
+        (<p> "Creates an interval.")
+        (<p> "When given one argument, assumes that "(<cv>'specifier)" is an "(<a> href: "#interval-specifier" "interval specifier")", that is, a vector each of whose elements is either a nonnegative exact integer $u$ or a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$. In this case "(<code>'make-interval)" returns an interval of dimension "(<code>"(vector-length "(<var>'specifier)")")" with the following properties: If the $i$th entry of "(<cv>'specifier)" is a list of nonnegative exact integers $\\ell$ and $u$ with $\\ell\\leq u$, then the $i$th lower bound of the result is $\\ell$ and the $i$th upper bound of the result is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.")
+        (<p> "When given two arguments, assumes that "(<cv>'lowers)" and "(<cv>'uppers)" are vectors of the same length, each containing exact integers with "(<code>"(<= (vector-ref "(<var>"lowers")" i) (vector-ref "(<var>"uppers")" i))")" for all "(<code>'i)". In this case "(<code>'make-interval)" returns an interval with lower bounds "(<cv>'lowers)" and upper bounds "(<cv>'uppers)".")
+        (<p> "It is an error of the arguments do not satisfy these assumptions.")
+        (<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(3 (1 4))))
+      (B (make-interval '#(0 1) '#(3 4))))
   (interval= A B))   ;; => #t"))
+
+        (format-lambda-list '(interval->specifier interval) 'interval-rarrow-specifier)
+        (<p> "Assumes that the argument "(<cv>'interval)" is an interval.  Returns an "(<a> href: "#interval-specifier" "interval specifier")" from which "(<code>'make-interval)" can recreate the argument.  It is an error if "(<cv>'interval)" is not an interval.")
+        (<p>(<b> "Example: ")(<pre>(<code>"
+(let ((A (make-interval '#(0 1 0) '#(3 8 2))))
+  (pretty-print (interval->specifier A))) ;; => #(3 (1 8) 2)")))
+
 
         (format-lambda-list '(interval? object))
         (<p> "Returns "(<code> "#t")" if "(<code> (<var>"object"))" is an interval, and "(<code>"#f")" otherwise.")

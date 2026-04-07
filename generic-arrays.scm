@@ -206,16 +206,62 @@ OTHER DEALINGS IN THE SOFTWARE.
                        lower-bounds
                        upper-bounds)))
 
+(define (interval-specifier? obj)
+  (and (vector? obj)
+       (vector-every (lambda (entry)
+                       (or (and (exact-integer? entry)
+                                (not (negative? entry)))
+                           (and (pair? entry)
+                                (pair? (cdr entry))
+                                (null? (cddr entry))
+                                (exact-integer? (car entry))
+                                (exact-integer? (cadr entry))
+                                (<= (car entry) (cadr entry)))))
+                     obj)))
+
+(define (%%interval->specifier interval)
+  (vector-map (lambda (lower upper)
+                (if (eqv? lower 0)
+                    upper
+                    (list lower upper)))
+              (%%interval-lower-bounds interval)
+              (%%interval-upper-bounds  interval)))
+
+(define (interval->specifier interval)
+  (if (interval? interval)
+      (%%interval->specifier interval)
+      (error "interval->specifier: The argument is not an interval: "
+             interval)))
+
+(define (%%interval-or-specifier obj)
+  (or (and (interval? obj) obj)
+      (and (interval-specifier? obj) (%%specifier->interval obj))))
+
+(define (%%specifier->interval spec)
+  (if (vector-every exact-integer? spec)
+      (%%finish-interval (%%allocate-zero-vector (vector-length spec))
+                         (vector-copy spec))
+      (let* ((n (vector-length spec))
+             (lowers (make-vector n))
+             (uppers (make-vector n)))
+        (do ((i 0 (fx+ i 1)))
+            ((fx= i n)
+             (%%finish-interval lowers uppers))
+          (let ((entry (vector-ref spec i)))
+            (cond ((pair? entry)
+                   (vector-set! lowers i (car entry))
+                   (vector-set! uppers i (cadr entry)))
+                  (else
+                   (vector-set! lowers i 0)
+                   (vector-set! uppers i entry))))))))
+
 (define make-interval
   (case-lambda
-   ((upper-bounds)
-    (cond ((not (and (vector? upper-bounds)
-                     (vector-every (lambda (x) (exact-integer? x)) upper-bounds)
-                     (vector-every (lambda (x) (not (negative? x))) upper-bounds)))
-           (error "make-interval: The argument is not a vector of nonnegative exact integers: " upper-bounds))
-          (else
-           (%%finish-interval (%%allocate-zero-vector (vector-length upper-bounds))
-                              (vector-copy upper-bounds)))))
+   ((interval-specifier)
+    (if (interval-specifier? interval-specifier)
+        (%%specifier->interval interval-specifier)
+        (error "make-interval: The argument is not an interval specifier: "
+               interval-specifier)))
    ((lower-bounds upper-bounds)
     (cond ((not (and (vector? lower-bounds)
                      (vector-every (lambda (x) (exact-integer? x)) lower-bounds)))
@@ -736,7 +782,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                             interval)))
                    intervals))
              (lower-bounds
-              (%%interval-lower-bounds (car intervals)))
+              (%%interval-lower-bounds->vector (car intervals))) ;; copy lower bounds
              (max-upper-bounds
               (list->vector
                (map (lambda (k)
@@ -761,7 +807,7 @@ OTHER DEALINGS IN THE SOFTWARE.
                                            (vector-ref max-upper-bounds k)))
                                    intervals))))
                     indices)
-             (make-interval lower-bounds max-upper-bounds)))))
+             (%%finish-interval lower-bounds max-upper-bounds)))))
 
 (define (compute-broadcast-interval interval . intervals)
   (if (every interval? (cons interval intervals))
@@ -5204,10 +5250,11 @@ OTHER DEALINGS IN THE SOFTWARE.
                     (result
                      ;; the result array
                      (%%make-specialized-array
-                      (let ()
+                      (let ((lowers (vector-copy lowers))
+                            (uppers (vector-copy uppers)))
                         (vector-set! lowers k 0)
                         (vector-set! uppers k kth-size)
-                        (make-interval lowers uppers))  ;; copies lowers and uppers
+                        (%%finish-interval lowers uppers))
                       storage-class
                       (storage-class-default storage-class))))
                (let loop ((arrays arrays)
