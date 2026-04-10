@@ -1783,10 +1783,6 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 |#
 
-;;; This sample implementation does not implement the following.
-
-(define f8-storage-class #f)
-
 ;;;
 ;;; The indexer field of a specialized-array obj is a  mapping from
 ;;;

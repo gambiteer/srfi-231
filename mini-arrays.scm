@@ -825,8 +825,6 @@
          data
          (error "Expecting a u16vector passed to (storage-class-data->body f16-storage-class): " data)))))
 
-(define f8-storage-class #f)
-
 (define (%%indexer base lowers increments)
   (lambda args
     (fold +

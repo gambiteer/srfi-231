@@ -501,7 +501,6 @@ So we had to make some decisions about how to broadcast generalized arrays and a
                  (<a> href: "#u16-storage-class" "u16-storage-class") END
                  (<a> href: "#u32-storage-class" "u32-storage-class") END
                  (<a> href: "#u64-storage-class" "u64-storage-class") END
-                 (<a> href: "#f8-storage-class" "f8-storage-class") END
                  (<a> href: "#f16-storage-class" "f16-storage-class") END
                  (<a> href: "#f32-storage-class" "f32-storage-class") END
                  (<a> href: "#f64-storage-class" "f64-storage-class") END
@@ -1150,7 +1149,6 @@ the backing store are of some \"type\", either heterogeneous (all Scheme types) 
 (format-global-variable 'u16-storage-class)
 (format-global-variable 'u32-storage-class)
 (format-global-variable 'u64-storage-class)
-(format-global-variable 'f8-storage-class)
 (format-global-variable 'f16-storage-class)
 (format-global-variable 'f32-storage-class)
 (format-global-variable 'f64-storage-class)

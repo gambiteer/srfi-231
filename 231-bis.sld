@@ -58,7 +58,6 @@
     u16-storage-class
     u32-storage-class
     u64-storage-class
-    f8-storage-class
     f16-storage-class
     f32-storage-class
     f64-storage-class
