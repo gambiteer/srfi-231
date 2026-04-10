@@ -142,6 +142,7 @@ MathJax.Hub.Config({
          (<li> "The calling sequences for "(<a> href: "#interval-fold-left"(<code>'interval-fold-left))" and "(<a> href: "#interval-fold-right"(<code>'interval-fold-right))" have been changed.")
          (<li> (<code>'array-freeze!)" has been removed as a user-visible procedure.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly \"freeze\" a mutable array to make an immutable array.")
          (<li> "The default entry for arrays of generic-storage-class is now 0, not "(<code>'#f)", which we find to be more useful.")
+         (<li> "We no longer require that "(<code>'f8-storage-class)" be defined, as there is no standardized format.")
          (<li> "The routines "(<code>'array-outer-product)" and "(<code>'array-inner-product)" are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure "(<code>'array-inner-product)" now returns a specialized, not a generalized, array result.")
          (<li> "Both "(<a> href: "#explicit-array-broadcasting" "explicit")" and "(<a> href: "#implicit-array-broadcasting" "implicit")" array broadcasting are specified in this SRFI extension.")
          (<li> "This document introduces "(<a> href: "#interval-specifier" "interval specifiers")" to allow specifying intervals more succinctly.")

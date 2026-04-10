@@ -87,6 +87,7 @@
       <li>The calling sequences for <a href="#interval-fold-left"><code>interval-fold-left</code></a> and <a href="#interval-fold-right"><code>interval-fold-right</code></a> have been changed.</li>
       <li><code>array-freeze!</code> has been removed as a user-visible procedure.  Because array setters are reified and can be stored in structures, passed as arguments, etc., one cannot truly &quot;freeze&quot; a mutable array to make an immutable array.</li>
       <li>The default entry for arrays of generic-storage-class is now 0, not <code>#f</code>, which we find to be more useful.</li>
+      <li>We no longer require that <code>f8-storage-class</code> be defined, as there is no standardized format.</li>
       <li>The routines <code>array-outer-product</code> and <code>array-inner-product</code> are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure <code>array-inner-product</code> now returns a specialized, not a generalized, array result.</li>
       <li>Both <a href="#explicit-array-broadcasting">explicit</a> and <a href="#implicit-array-broadcasting">implicit</a> array broadcasting are specified in this SRFI extension.</li>
       <li>This document introduces <a href="#interval-specifier">interval specifiers</a> to allow specifying intervals more succinctly.</li>
