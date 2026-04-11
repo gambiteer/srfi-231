@@ -1547,6 +1547,114 @@ if "(<code>(<var> 'array))" is not a mutable array.")
  0 => 0
  1 => 2
 #f"))
+(<p>(<b> "Example: ")" One can exploit knowledge that arrays are packed to write faster code, as in the following example using the sample implementation on Gambit Scheme 4.9.7: ")
+(<pre>(<code>"(declare
+  (standard-bindings)
+  (extended-bindings)
+  (block)
+  (not safe))
+
+(define (array-dot-product A B)
+  ;; Assumes that A and B have the same domain
+  ;; and that the elements of A and B are flonums.
+  (if (and (specialized-array? A)
+           (specialized-array? B)
+           (eq? (array-storage-class A)
+                f64-storage-class)
+           (eq? (array-storage-class B)
+                f64-storage-class)
+           (array-packed? A)
+           (array-packed? B))
+      ;; Exploit that the elements of A and B are
+      ;; stored in consecutive elements of f64vectors
+      ;; and compute the dot product in a simple loop.
+      (let* ((domain (array-domain A))
+             (lowers (interval-lower-bounds->list domain))
+             (A-base (apply (array-indexer A) lowers))
+             (B-base (apply (array-indexer B) lowers))
+             (A-body (array-body A))
+             (B-body (array-body B)))
+        (do ((i A-base (fx+ i 1))
+             (j B-base (fx+ j 1))
+             (sum 0. (fl+ sum (fl* (f64vector-ref A-body i)
+                                   (f64vector-ref B-body j))))
+             (elements-left (interval-volume domain) (fx- elements-left 1)))
+            ((eqv? elements-left 0) sum)))
+      ;;; Code for the general case.
+      (array-fold-left
+       (lambda (sum a b) (fl+ sum (fl* a b))) 0.
+       A B)))
+
+
+;;; A 1000 x 1000 array of random reals between 0 and 1
+(define A (array-copy (make-array (make-interval '#(1000 1000))
+                                  (lambda (i j) (random-real)))
+                      f64-storage-class))
+
+;;; Copy the transpose of A
+
+(define B (array-copy (array-permute A '#(1 0))))
+
+;;; Take the dot product of the top and bottom halves of A, which
+;;; are both packed, using the code above that runs a simple loop.
+
+(pretty-print
+ (time
+  (array-dot-product
+   (array-extract A (make-interval '#(500 1000)))
+   (array-rebase (array-extract A (make-interval '#((500 1000) 1000)))))))
+
+;;; Take the dot product of the top and bottom halves of A, which
+;;; are both packed, but now use array-fold-left:
+
+(pretty-print
+ (time
+  (array-fold-left
+   (lambda (sum a b) (fl+ sum (fl* a b))) 0.
+   (array-extract A (make-interval '#(500 1000)))
+   (array-rebase (array-extract A (make-interval '#((500 1000) 1000)))))))
+
+;;; Take the dot product of the left and right halves of B, which
+;;; are not packed. This should give the same numerical result
+;;; to within a multiple of rounding error
+
+(pretty-print
+ (time
+  (array-dot-product
+   (array-extract B (make-interval '#(1000 500)))
+   (array-rebase (array-extract B (make-interval '#(1000 (500 1000))))))))"))
+(<p> "This yields the following results: ")
+(<pre>(<code>"(load \"dot-product-example\")
+(time (array-dot-product (array-extract A (make-interval '#(500 1000))) (array-rebase (array-extract A (make-interval '#((500 1000) 1000))))))
+    0.001399 secs real time
+    0.001415 secs cpu time (0.001415 user, 0.000000 system)
+    no collections
+    8240 bytes allocated
+    no minor faults
+    no major faults
+    5003382 cpu cycles
+124772.44826682197
+(time (array-fold-left (lambda (sum a b) (fl+ sum (fl* a b))) 0. (array-extract A (make-interval '#(500 1000))) (array-rebase (array-extract A (make-interval '#((500 1000) 1000))))))
+    0.008380 secs real time
+    0.008365 secs cpu time (0.008365 user, 0.000000 system)
+    no collections
+    8864 bytes allocated
+    no minor faults
+    no major faults
+    30061635 cpu cycles
+124772.44826682197
+(time (array-dot-product (array-extract B (make-interval '#(1000 500))) (array-rebase (array-extract B (make-interval '#(1000 (500 1000)))))))
+    0.015703 secs real time
+    0.015625 secs cpu time (0.015625 user, 0.000000 system)
+    no collections
+    8944 bytes allocated
+    no minor faults
+    no major faults
+    56368629 cpu cycles
+124772.4482668183
+\"/home/lucier/lang/scheme/srfi-231/srfi-231-bis/dot-product-example.o11\""))
+(<p> "You can see that the sample implementation has faster code for "(<code>'array-fold-left)
+     " when all the array arguments are packed.")
 
 (format-lambda-list '(specialized-array-share array new-domain new-domain->old-domain))
 (<p> "Constructs a new specialized array that shares the body of the specialized array "(<code>(<var> 'array))".
