@@ -53,6 +53,11 @@
               (%%interval-lower-bounds interval)
               (%%interval-upper-bounds  interval)))
 
+(define (%%interval-or-specifier object)
+  (cond ((interval? object) object)
+        ((interval-specifier? object) (make-interval object))
+        (else (error "Expecting interval or interval specifier: " object))))
+
 (define make-interval
   (case-lambda
    ((specifier)
@@ -369,6 +374,7 @@
 (define make-array
   (case-lambda
    ((domain getter)
+    (set! domain (%%interval-or-specifier domain))
     (make-%%array domain
                   getter
                   #f      ;; setter
@@ -376,6 +382,7 @@
                   #f      ;; body
                   #f))    ;; indexer
    ((domain getter setter)
+    (set! domain (%%interval-or-specifier domain))
     (make-%%array domain
                   getter
                   setter
@@ -964,6 +971,7 @@
    ((interval storage-class)
     (make-specialized-array interval storage-class (storage-class-default storage-class)))
    ((interval storage-class initial-value)
+    (set! interval (%%interval-or-specifier interval))
     (%%make-specialized-array interval
                               storage-class
                               initial-value))))
@@ -994,6 +1002,7 @@
    ((interval l storage-class)
     (list->array interval l storage-class (specialized-array-default-mutable?)))
    ((interval l storage-class mutable?)
+    (set! interval (%%interval-or-specifier interval))
     (let* ((checker (storage-class-checker storage-class))
            (setter  (storage-class-setter  storage-class))
            (result  (%%make-specialized-array interval
@@ -1033,6 +1042,7 @@
    ((interval v storage-class)
     (vector->array interval v storage-class (specialized-array-default-mutable?)))
    ((interval v storage-class mutable?)
+    (set! interval (%%interval-or-specifier interval))
     (let* ((v       (vector-copy v))
            (n       (vector-length v))
            (body    ((storage-class-maker storage-class)
@@ -1318,6 +1328,7 @@
 (define (specialized-array-share array
                                  new-domain
                                  new-domain->old-domain)
+  (set! new-domain (%%interval-or-specifier new-domain))
   (let ((old-domain        (%%array-domain       array))
         (old-indexer       (%%array-indexer      array))
         (body              (%%array-body         array))
@@ -1329,6 +1340,7 @@
                                 (mutable-array? array))))
 
 (define (array-extract array new-domain)
+  (set! new-domain (%%interval-or-specifier new-domain))
   (cond ((specialized-array? array)
          (specialized-array-share array new-domain values))
         ((mutable-array? array)
@@ -1586,6 +1598,7 @@
              arrays)))))
 
 (define (array-broadcast array new-domain)
+  (set! new-domain (%%interval-or-specifier new-domain))
   (if (interval= (array-domain array) new-domain)
       array
       (let* ((new-dimension (interval-dimension new-domain))
@@ -2007,6 +2020,8 @@
                 (else
                  (helper (fx+ k 1) i))))
         (helper 0 0)))
+
+    (set! new-domain (%%interval-or-specifier new-domain))
 
     (let* ((indexer
             (array-indexer array))

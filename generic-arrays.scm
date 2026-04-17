@@ -1231,23 +1231,25 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define make-array
   (case-lambda
    ((domain getter)
-    (cond ((not (interval? domain))
-           (error "make-array: The first argument is not an interval: " domain getter))
+    (define Domain (%%interval-or-specifier domain))
+    (cond ((not (interval? Domain))
+           (error "make-array: The first argument does not determine an interval: " domain getter))
           ((not (procedure? getter))
            (error "make-array: The second argument is not a procedure: " domain getter))
           (else
            ;; we're going to add checking that the arguments to the getter are valid
-           (%%make-safer-array domain getter))))
+           (%%make-safer-array Domain getter))))
    ((domain getter setter)
-    (cond ((not (interval? domain))
-           (error "make-array: The first argument is not an interval: " domain getter setter))
+    (define Domain (%%interval-or-specifier domain))
+    (cond ((not (interval? Domain))
+           (error "make-array: The first argument does not determine an interval: " domain getter setter))
           ((not (procedure? getter))
            (error "make-array: The second argument is not a procedure: " domain getter setter))
           ((not (procedure? setter))
            (error "make-array: The third argument is not a procedure: " domain getter setter))
           (else
            ;; we're going to add checking that the arguments to getter and setter are valid
-           (%%make-safer-array domain getter setter))))))
+           (%%make-safer-array Domain getter setter))))))
 
 (define (array? x)
   (%%array? x))
@@ -2749,11 +2751,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define make-specialized-array
   (let ()
     (define (one-arg interval storage-class initial-value)
-      (cond ((not (interval? interval))
-             (error "make-specialized-array: The first argument is not an interval: "
+      (define Interval (%%interval-or-specifier interval))
+      (cond ((not (interval? Interval))
+             (error "make-specialized-array: The first argument does not determine an interval: "
                     interval))
             (else
-             (%%make-specialized-array interval
+             (%%make-specialized-array Interval
                                        storage-class
                                        initial-value))))
     (define (two-args interval storage-class initial-value)
@@ -3259,11 +3262,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 (define (specialized-array-share array
                                  new-domain
                                  new-domain->old-domain)
+  (define New-domain (%%interval-or-specifier new-domain))
   (cond ((not (specialized-array? array))
          (error "specialized-array-share: The first argument is not a specialized-array: "
                 array new-domain new-domain->old-domain))
-        ((not (interval? new-domain))
-         (error "specialized-array-share: The second argument is not an interval: "
+        ((not (interval? New-domain))
+         (error "specialized-array-share: The second argument does not determine an interval: "
                 array new-domain new-domain->old-domain))
         ((not (procedure? new-domain->old-domain))
          (error "specialized-array-share: The third argument is not a procedure: "
@@ -3273,7 +3277,7 @@ OTHER DEALINGS IN THE SOFTWARE.
          (error "specialized-array-share: Sharing an empty array to a nonempty interval: " array new-domain new-domain->old-domain))
         (else
          (%%specialized-array-share array
-                                    new-domain
+                                    New-domain
                                     new-domain->old-domain))))
 
 (define (%%immutable-array-extract array new-domain)
@@ -3297,17 +3301,18 @@ OTHER DEALINGS IN THE SOFTWARE.
          (%%immutable-array-extract array new-domain))))
 
 (define (array-extract array new-domain)
+  (define New-domain (%%interval-or-specifier new-domain))
   (cond ((not (array? array))
          (error "array-extract: The first argument is not an array: " array new-domain))
-        ((not (interval? new-domain))
-         (error "array-extract: The second argument is not an interval: " array new-domain))
+        ((not (interval? New-domain))
+         (error "array-extract: The second argument does not determine an interval: " array new-domain))
         ((not (fx= (%%array-dimension array)
-                   (%%interval-dimension new-domain)))
+                   (%%interval-dimension New-domain)))
          (error "array-extract: The dimension of the second argument (an interval) does not equal the dimension of the domain of the first argument (an array): " array new-domain))
-        ((not (%%interval-subset? new-domain (%%array-domain array)))
+        ((not (%%interval-subset? New-domain (%%array-domain array)))
          (error "array-extract: The second argument (an interval) is not a subset of the domain of the first argument (an array): " array new-domain))
         (else
-         (%%array-extract array new-domain))))
+         (%%array-extract array New-domain))))
 
 (define (array-tile A slice-widths)
 
@@ -4071,25 +4076,26 @@ OTHER DEALINGS IN THE SOFTWARE.
                                       args-to-trim))))))
 
 (define (array-broadcast array new-domain)
+  (define New-domain (%%interval-or-specifier new-domain))
   (cond ((not (array? array))
          (error "array-broadcast: The first argument is not an array: " array new-domain))
-        ((not (interval? new-domain))
-         (error "array-broadcast: The second argument is not an interval: " array new-domain))
-        ((%%interval= (%%array-domain array) new-domain)  ;; fast path
+        ((not (interval? New-domain))
+         (error "array-broadcast: The second argument does not determine an interval: " array new-domain))
+        ((%%interval= (%%array-domain array) New-domain)  ;; fast path
          array)
         ((not (let ((broadcast-domain
-                     (%%compute-broadcast-interval (list (%%array-domain array) new-domain))))
+                     (%%compute-broadcast-interval (list (%%array-domain array) New-domain))))
                 (and broadcast-domain
-                     (%%interval= broadcast-domain new-domain))))
+                     (%%interval= broadcast-domain New-domain))))
          (error "array-broadcast: The first argument cannot be broadcast to the second argument: "
                 array new-domain))
         ((and (not (specialized-array? array))
               (fx< (%%interval-volume (%%array-domain array))
-                   (%%interval-volume new-domain)))
+                   (%%interval-volume New-domain)))
          (error "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: "
                 array new-domain))
         (else
-         (%%array-broadcast array new-domain))))
+         (%%array-broadcast array New-domain))))
 
 (define (%%array-outer-product combiner A B caller)
   (let* ((A              (%%->specialized-array A generic-storage-class caller))
@@ -4888,8 +4894,9 @@ OTHER DEALINGS IN THE SOFTWARE.
                      #!optional
                      (result-storage-class generic-storage-class)
                      (mutable? (specialized-array-default-mutable?)))
-  (cond ((not (interval? interval))
-         (error "list->array: The first argument is not an interval: " interval l))
+  (define Interval (%%interval-or-specifier interval))
+  (cond ((not (interval? Interval))
+         (error "list->array: The first argument does not determine an interval: " interval l))
         ((not (list? l))
          (error "list->array: The second argument is not a list: " interval l))
         ((not (storage-class? result-storage-class))
@@ -4897,7 +4904,7 @@ OTHER DEALINGS IN THE SOFTWARE.
         ((not (boolean? mutable?))
          (error "list->array: The fourth argument is not a boolean: " interval l result-storage-class mutable?))
         (else
-         (%%list->array interval
+         (%%list->array Interval
                         l
                         result-storage-class
                         mutable?
@@ -4947,19 +4954,20 @@ OTHER DEALINGS IN THE SOFTWARE.
                        #!optional
                        (result-storage-class generic-storage-class)
                        (mutable? (specialized-array-default-mutable?)))
-  (cond ((not (interval? interval))
-         (error "vector->array: The first argument is not an interval: " interval v))
+  (define Interval (%%interval-or-specifier interval))
+  (cond ((not (interval? Interval))
+         (error "vector->array: The first argument does not determine an interval: " interval v))
         ((not (vector? v))
          (error "vector->array: The second argument is not a vector: " interval v))
         ((not (= (vector-length v)
-                 (%%interval-volume interval)))
+                 (%%interval-volume Interval)))
          (error "vector->array: The volume of the first argument does not equal the length of the second: " interval v))
         ((not (storage-class? result-storage-class))
          (error "vector->array: The third argument is not a storage-class: " interval v result-storage-class))
         ((not (boolean? mutable?))
          (error "vector->array: The fourth argument is not a boolean: " interval v result-storage-class mutable?))
         (else
-         (%%vector->array interval
+         (%%vector->array Interval
                           v
                           result-storage-class
                           mutable?
@@ -5563,17 +5571,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 |#
 
 (define (specialized-array-reshape array new-domain #!optional (copy-on-failure? #f))
+  (define New-domain (%%interval-or-specifier new-domain))
   (cond ((not (specialized-array? array))
          (error "specialized-array-reshape: The first argument is not a specialized array: " array new-domain))
-        ((not (interval? new-domain))
-         (error "specialized-array-reshape: The second argument is not an interval " array new-domain))
+        ((not (interval? New-domain))
+         (error "specialized-array-reshape: The second argument does not determine an interval " array new-domain))
         ((not (fx= (%%interval-volume (%%array-domain array))
-                   (%%interval-volume new-domain)))
+                   (%%interval-volume New-domain)))
          (error "specialized-array-reshape: The volume of the domain of the first argument is not equal to the volume of the second argument: " array new-domain))
         ((not (boolean? copy-on-failure?))
          (error "specialized-array-reshape: The third argument is not a boolean: " array new-domain copy-on-failure?))
         (else
-         (%%specialized-array-reshape array new-domain copy-on-failure?))))
+         (%%specialized-array-reshape array New-domain copy-on-failure?))))
 
 (define (%%specialized-array-reshape array new-domain copy-on-failure?)
 

@@ -37,6 +37,7 @@
               <li><a href="#explicit-array-broadcasting">Explicit array broadcasting</a></li>
               <li><a href="#implicit-array-broadcasting">Implicit array broadcasting</a></li>
             </ul></li>
+          <li><a href="#interval-specifiers">Interval specifiers</a></li>
           <li><a href="#convention">Notational convention</a></li>
         </ul></li>
       <li><a href="#Notes">Notes</a></li>
@@ -90,7 +91,7 @@
       <li>We no longer require that <code>f8-storage-class</code> be defined, as there is no standardized format.</li>
       <li>The routines <code>array-outer-product</code> and <code>array-inner-product</code> are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure <code>array-inner-product</code> now returns a specialized, not a generalized, array result.</li>
       <li>Both <a href="#explicit-array-broadcasting">explicit</a> and <a href="#implicit-array-broadcasting">implicit</a> array broadcasting are specified in this SRFI extension.</li>
-      <li>This document introduces <a href="#interval-specifier">interval specifiers</a> to allow specifying intervals more succinctly.</li>
+      <li>This document introduces <a href="#interval-specifiers">interval specifiers</a> to allow specifying intervals more succinctly.</li>
       <li>The parameter <a href="#array-broadcasting?">array-broadcasting?</a> has been added to the SRFI.</li>
       <li>The routines <a href="#interval-specifier?"><code>interval-specifier?</code></a>, <a href="#interval-rarrow-specifier"><code>interval-&gt;specifier?</code></a>, <a href="#interval-every"><code>interval-every</code></a>, <a href="#interval-any"><code>interval-any</code></a>, <a href="#interval-rebase"><code>interval-rebase</code></a>, <a href="#array-rebase"><code>array-rebase</code></a>, <a href="#interval-insert-axis"><code>interval-insert-axis</code></a>, <a href="#object-rarrow-array"><code>object-&gt;array</code></a>, <a href="#array-insert-axis"><code>array-insert-axis</code></a>, <a href="#compute-broadcast-interval"><code>compute-broadcast-interval</code></a>, <a href="#array-broadcast"><code>array-broadcast</code></a> have been added to the SRFI.</li>
     </ul>
@@ -206,6 +207,9 @@
     <h4><a id="implicit-array-broadcasting">Implicit array broadcasting</a></h4>
     <p>Array arguments to the procedures <code><a href="#array-map">array-map</a></code>, <code><a href="#array-for-each">array-for-each</a></code>, <code><a href="#array-every">array-every</a></code>, <code><a href="#array-any">array-any</a></code>, <code><a href="#array-fold-left">array-fold-left</a></code>, and <code><a href="#array-fold-right">array-fold-right</a></code> will automatically and implicitly be broadcast to a common domain if the parameter <code>array-broadcasting?</code> is <code>#t</code> at the time the procedure is called. If the value of that parameter is <code>#f</code>, then the array arguments to these procedures are required to have the same domains.</p>
     <p>The implicit broadcasting of array arguments works as follows.  If the array arguments to one of these procedures are collected into a list called <code><var>As</var></code>, then  <code>(apply compute-broadcast-interval (map array-domain <var>As</var>))</code>, the common broadcast domain of the array arguments, is computed, which we'll call <code><var>ND</var></code> for &quot;new domain&quot;. The list of array arguments <code><var>As</var></code> is then replaced with <code>(map (lambda (A) (array-broadcast <var>A ND</var>)) <var>As</var>)</code>, the array arguments broadcast to <code><var>ND</var></code>.  It is an error if any part of this process fails due to incompatible domains.</p>
+    <h3><a id="interval-specifiers">Interval specifiers</a></h3>
+    <p>An <i>interval specifier</i> is a vector, each of whose entries is either a list of two exact integers $\ell$ and $u$ with $\ell\leq u$ or a nonnegative exact integer $u$.  Such a vector, which we'll call <code><var>specifier</var></code>, specifies an interval with dimension <code>(vector-length <var>specifier</var>)</code> with the property: If the $i$th entry of <code><var>specifier</var></code> is a list of nonnegative exact integers $\ell$ and $u$ with $\ell\leq u$, then the $i$th lower bound of the interval is $\ell$ and the $i$th upper bound of the interval is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.</p>
+    <p>Some procedures accept as certain arguments either an interval or, for convenience, an interval specifier, which is converted to an interval at procedure call time. Note that checking the correctness of a specifier argument and constructing the associated interval can take noticeable computation time (especially for small arrays) compared to passing preconstructed intervals.</p>
     <h3><a id="convention">Notational convention</a></h3>
     <p>If <code><var>A</var></code> is an array, then we generally define <code><var>A_</var></code> to be <code>(array-getter <var>A</var>)</code> and  <code><var>A!</var></code> to be <code>(array-setter <var>A</var>)</code>.  The latter notation is motivated by the general Scheme convention that the names of procedures that modify the contents of data structures end in <code><var>!</var></code>, while the notation for the getter of an array is motivated by the TeX notation for subscripts.  See particularly the <a href="#Haar">Haar transform</a> example.</p>
     <h2><a id="Notes">Notes</a></h2>
@@ -364,7 +368,7 @@
     <h2><a id="Miscellaneous">Miscellaneous procedures</a></h2>
     <p>This document refers to <i>translations</i>, <i>permutations</i>, and <i>interval specifiers</i>.
        A translation is a vector of exact integers.  A permutation of dimension $n$
-      is a vector whose entries are the exact integers $0,1,\ldots,n-1$, each occurring once, in any order.  <a id="interval-specifier">An interval specifier is a vector, each entry of which is either a nonnegative exact integer $u$ or a list of two exact integers $\ell$ and $u$ with $\ell\leq u$.</a></p>
+      is a vector whose entries are the exact integers $0,1,\ldots,n-1$, each occurring once, in any order.  An interval specifier is a vector, each entry of which is either a nonnegative exact integer $u$ or a list of two exact integers $\ell$ and $u$ with $\ell\leq u$.</p>
     <p>We also provide four procedures that return useful permutations.</p>
     <h3><a id="miscprocedures">Procedures</a></h3>
     <p><b>Procedure: </b><code><a id="translation?">translation?</a> <var>object</var></code></p>
@@ -416,7 +420,7 @@
     <p><b>Procedure: </b><code><a id="make-interval">make-interval</a> <var>specifier</var></code></p>
     <p><b>Procedure: </b><code><a id="make-interval">make-interval</a> <var>lowers</var> <var>uppers</var></code></p>
     <p>Creates an interval.</p>
-    <p>When given one argument, assumes that <code><var>specifier</var></code> is an <a href="#interval-specifier">interval specifier</a>, that is, a vector each of whose elements is either a nonnegative exact integer $u$ or a list of two exact integers $\ell$ and $u$ with $\ell\leq u$. In this case <code>make-interval</code> returns an interval of dimension <code>(vector-length <var>specifier</var>)</code> with the following properties: If the $i$th entry of <code><var>specifier</var></code> is a list of nonnegative exact integers $\ell$ and $u$ with $\ell\leq u$, then the $i$th lower bound of the result is $\ell$ and the $i$th upper bound of the result is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.</p>
+    <p>When given one argument, assumes that <code><var>specifier</var></code> is an <a href="#interval-specifiers">interval specifier</a>, that is, a vector each of whose elements is either a nonnegative exact integer $u$ or a list of two exact integers $\ell$ and $u$ with $\ell\leq u$. In this case <code>make-interval</code> returns an interval of dimension <code>(vector-length <var>specifier</var>)</code> with the following properties: If the $i$th entry of <code><var>specifier</var></code> is a list of nonnegative exact integers $\ell$ and $u$ with $\ell\leq u$, then the $i$th lower bound of the result is $\ell$ and the $i$th upper bound of the result is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.</p>
     <p>When given two arguments, assumes that <code><var>lowers</var></code> and <code><var>uppers</var></code> are vectors of the same length, each containing exact integers with <code>(&lt;= (vector-ref <var>lowers</var> i) (vector-ref <var>uppers</var> i))</code> for all <code>i</code>. In this case <code>make-interval</code> returns an interval with lower bounds <code><var>lowers</var></code> and upper bounds <code><var>uppers</var></code>.</p>
     <p>It is an error of the arguments do not satisfy these assumptions.</p>
     <p><b>Example: </b></p>
@@ -424,7 +428,7 @@
       (B (make-interval '#(0 1) '#(3 4))))
   (interval= A B))   ;; =&gt; #t</code></pre>
     <p><b>Procedure: </b><code><a id="interval-rarrow-specifier">interval-&gt;specifier</a> <var>interval</var></code></p>
-    <p>Assumes that the argument <code><var>interval</var></code> is an interval.  Returns an <a href="#interval-specifier">interval specifier</a> from which <code>make-interval</code> can recreate the argument.  It is an error if <code><var>interval</var></code> is not an interval.</p>
+    <p>Assumes that the argument <code><var>interval</var></code> is an interval.  Returns an <a href="#interval-specifiers">interval specifier</a> from which <code>make-interval</code> can recreate the argument.  It is an error if <code><var>interval</var></code> is not an interval.</p>
     <p><b>Example: </b>
       <pre><code>
 (let ((A (make-interval '#(0 1 0) '#(3 8 2))))
@@ -953,6 +957,7 @@
     <p>A parameter as specified in <a href="https://srfi.schemers.org/srfi-39/">SRFI 39</a>. Initially, <code>(array-broadcasting?)</code> returns <code>#t</code>. It is an error to call <code>(array-broadcasting? <var>arg</var>)</code> if <code><var>arg</var></code> is not a boolean.</p>
     <h3><a id="arrayprocedures">Procedures</a></h3>
     <p><b>Procedure: </b><code><a id="make-array">make-array</a> <var>interval</var> <var>getter</var> [ <var>setter</var> ]</code></p>
+    <p>The first argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Assume first that the optional argument <code>setter</code> is not given.</p>
     <p>If <code><var>interval</var></code> is an interval and <code><var>getter</var></code> is a procedure from
       <code><var>interval</var></code> to Scheme objects, then <code>make-array</code> returns an array with domain <code><var>interval</var></code>
@@ -1084,7 +1089,7 @@
   (array-empty? B))  ;; =&gt; #t</code></pre>
     <p><b>Procedure: </b><code><a id="make-specialized-array">make-specialized-array</a> <var>interval</var> [ <var>storage-class</var> [ <var>initial-value</var> ] ]</code></p>
     <p>Constructs a mutable specialized array from its arguments.</p>
-    <p><code><var>interval</var></code> must be given an interval. If given, <code><var>storage-class</var></code> must be a storage class; if it is not given, it defaults to <code>generic-storage-class</code>. If given, <code><var>initial-value</var></code> must be a value that can be manipulated by <code><var>storage-class</var></code>; if it is not given, it defaults to <code>(storage-class-default <var>storage-class</var>)</code>.</p>
+    <p><code><var>interval</var></code> must be an interval or an <a href="#interval-specifiers">interval specifier</a>, which is converted to an interval. If given, <code><var>storage-class</var></code> must be a storage class; if it is not given, it defaults to <code>generic-storage-class</code>. If given, <code><var>initial-value</var></code> must be a value that can be manipulated by <code><var>storage-class</var></code>; if it is not given, it defaults to <code>(storage-class-default <var>storage-class</var>)</code>.</p>
     <p>The body of the result is constructed as </p>
     <pre><code>  ((storage-class-maker <var>storage-class</var>)
    (interval-volume <var>interval</var>)
@@ -1331,6 +1336,7 @@
 &quot;/home/lucier/lang/scheme/srfi-231/srfi-231-bis/dot-product-example.o11&quot;</code></pre>
     <p>You can see that the sample implementation has faster code for <code>array-fold-left</code> when all the array arguments are packed.</p>
     <p><b>Procedure: </b><code><a id="specialized-array-share">specialized-array-share</a> <var>array</var> <var>new-domain</var> <var>new-domain-&gt;old-domain</var></code></p>
+    <p>The second argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Constructs a new specialized array that shares the body of the specialized array <code><var>array</var></code>.
       Returns an object that is behaviorally equivalent to a specialized array with the following fields:</p>
     <pre><code>domain:        new-domain
@@ -1535,6 +1541,7 @@ indexer:       (lambda multi-index
 =&gt;
 1</code></pre>
     <p><b>Procedure: </b><code><a id="array-extract">array-extract</a> <var>array</var> <var>interval</var></code></p>
+    <p>The second argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Returns a new array with the same getter (and setter, if appropriate) of the first argument, defined on the second argument.</p>
     <p>Assumes that <code><var>array</var></code> is an array and <code><var>interval</var></code> is an interval that is a sub-interval of <code>(array-domain <var>array</var>)</code>.  If <code><var>array</var></code> is a specialized array, then returns </p>
     <pre><code>  (specialized-array-share <var>array</var>
@@ -1972,6 +1979,7 @@ insert axis 2:
  1 2 0 =&gt; 5
  1 2 1 =&gt; 5</code></pre>
     <p><b>Procedure: </b><code><a id="array-broadcast">array-broadcast</a> <var>array</var> <var>new-domain</var></code></p>
+    <p>The second argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Assumes that <code><var>array</var></code> is an array and <code><var>new-domain</var></code> is an interval for which <code>(compute-broadcast-interval (array-domain <var>array</var>) <var>new-domain</var>)</code> returns <code><var>new-domain</var></code> itself.</p>
     <p>If <code><var>array</var></code> is a generalized array, then it is assumed that <code>(interval-volume (array-domain <var>array</var>))</code> is the same as <code>(interval-volume <var>new-domain</var>)</code>.  This necessarily means that <var>new-domain</var> can be derived from <code>(array-domain <var>array</var>)</code> solely by adding axes with lower bound 0 and upper bound 1 to the left of <code>(array-domain <var>array</var>)</code>; let's assume that <code>k</code> such axes have been added.</p>
     <p>Then if <code><var>array</var></code> is a mutable generalized array, <code>array-broadcast</code> returns</p>
@@ -2385,6 +2393,7 @@ B:
     <pre><code>(2 4 6 8)
 (8 6 4 2)</code></pre>
     <p><b>Procedure: </b><code><a id="list-rarrow-array">list-&gt;array</a> <var>interval</var> <var>list</var> [ <var>storage-class</var> [ <var>mutable?</var> ] ]</code></p>
+    <p>The first argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Assumes that <code><var>list</var></code> is a list, <code><var>interval</var></code> is an interval with volume the same as the length of <code><var>list</var></code>,  <code><var>storage-class</var></code> is a storage class that can manipulate all the elements of <code><var>list</var></code>, and <code><var>mutable?</var></code> is a boolean.</p>
     <p>Returns a specialized array with domain <code><var>interval</var></code> whose elements are the elements of the list <code><var>list</var></code> stored in lexicographical order.  The result is mutable depending on the value of <code><var>mutable?</var></code>.</p>
     <p>Any missing optional arguments are assigned the values <code>generic-storage-class</code> and <code>(specialized-array-default-mutable?)</code>, respectively.</p>
@@ -2516,6 +2525,7 @@ B:
     <pre><code>#(2 4 6 8)
 #(8 6 4 2)</code></pre>
     <p><b>Procedure: </b><code><a id="vector-rarrow-array">vector-&gt;array</a> <var>interval</var> <var>vector</var> [ <var>storage-class</var> [ <var>mutable?</var> ] ]</code></p>
+    <p>The first argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Assumes that <code><var>vector</var></code> is a vector, <code><var>interval</var></code> is an interval with volume the same as the length of <code><var>v</var></code>,  <code><var>storage-class</var></code> is a storage class that can manipulate all the elements of <code><var>vector</var></code>, and <code><var>mutable?</var></code> is a boolean.</p>
     <p>Returns a specialized array with domain <code><var>interval</var></code> whose elements are the elements of the vector <code><var>vector</var></code> stored in lexicographical order.  The result is mutable depending on the value of <code><var>mutable?</var></code>.</p>
     <p>Any missing optional arguments are assigned the values <code>generic-storage-class</code> and <code>(specialized-array-default-mutable?)</code>, respectively.</p>
@@ -2988,6 +2998,7 @@ A after assignment:
     <p><b>Note: </b>In the sample implementation, because <code>array-ref</code> and <code>array-set!</code> take a variable number of arguments and they must check that <code><var>A</var></code> is an array of the appropriate type, programs written in a style using these procedures, rather than the style in which <code>1D-Haar-loop</code> is coded below, can take up to three times as long runtime.</p>
     <p><b>Note: </b>In the sample implementation, checking whether the multi-indices are exact integers and within the domain of the array, and checking whether the value is appropriate for storage into the array, is delegated to the underlying definition of the array argument.  If the first argument is a  specialized array, then these items are checked.  If it is a generalized array, it is up to the programmer whether to define the getter and setter of the array to check the correctness of the arguments.</p>
     <p><b>Procedure: </b><code><a id="specialized-array-reshape">specialized-array-reshape</a> <var>array</var> <var>interval</var> [ <var>copy-on-failure?</var> #f ]</code></p>
+    <p>The second argument is assumed to be either an interval or an <a href="#interval-specifiers">interval specifier</a>, which is then converted to an interval.</p>
     <p>Assumes that <code><var>array</var></code> is a specialized array, <code><var>interval</var></code> is an interval with the same volume as <code>(array-domain <var>array</var>)</code>, and <code><var>copy-on-failure?</var></code>, if given, is a boolean.</p>
     <p>If there is an affine map that takes the multi-indices in <code><var>interval</var></code> to the cells in <code>(array-body <var>array</var>)</code> storing the elements of <code><var>array</var></code> in lexicographical order, <code>specialized-array-reshape</code> returns a new specialized array, with the same body and elements as <code><var>array</var></code> and domain <code><var>interval</var></code>.  The result inherits its mutability from <code><var>array</var></code>.</p>
     <p>If there is not an affine map that takes the multi-indices in <code><var>interval</var></code> to the cells storing the elements of <code><var>array</var></code> in lexicographical order and <code><var>copy-on-failure?</var></code> is <code>#t</code>, then returns a specialized array copy of <code><var>array</var></code> with domain <code><var>interval</var></code>, storage class <code>(array-storage-class <var>array</var>)</code> and mutability <code>(mutable-array? <var>array</var>)</code>.</p>

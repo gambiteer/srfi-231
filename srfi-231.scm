@@ -99,6 +99,7 @@ MathJax.Hub.Config({
                       (<ul>
                        (<li> (<a> href: "#explicit-array-broadcasting" "Explicit array broadcasting"))
                        (<li> (<a> href: "#implicit-array-broadcasting" "Implicit array broadcasting"))))
+                (<li> (<a> href: "#interval-specifiers" "Interval specifiers"))
                 (<li> (<a> href: "#convention" "Notational convention"))))
          (<li> (<a> href: "#Notes" "Notes"))
          (<li> (<a> href: "#Specification" "Specification"))
@@ -145,7 +146,7 @@ MathJax.Hub.Config({
          (<li> "We no longer require that "(<code>'f8-storage-class)" be defined, as there is no standardized format.")
          (<li> "The routines "(<code>'array-outer-product)" and "(<code>'array-inner-product)" are now specified to copy generalized array arguments to specialized arrays, evaluating all elements of such an array in an unspecified order.  The procedure "(<code>'array-inner-product)" now returns a specialized, not a generalized, array result.")
          (<li> "Both "(<a> href: "#explicit-array-broadcasting" "explicit")" and "(<a> href: "#implicit-array-broadcasting" "implicit")" array broadcasting are specified in this SRFI extension.")
-         (<li> "This document introduces "(<a> href: "#interval-specifier" "interval specifiers")" to allow specifying intervals more succinctly.")
+         (<li> "This document introduces "(<a> href: "#interval-specifiers" "interval specifiers")" to allow specifying intervals more succinctly.")
          (<li> "The parameter "(<a> href: "#array-broadcasting?" "array-broadcasting?")" has been added to the SRFI.")
          (<li> "The routines "
                (<a> href: "#interval-specifier?" (<code>'interval-specifier?))", "
@@ -405,6 +406,10 @@ So we had to make some decisions about how to broadcast generalized arrays and a
              "The list of array arguments "(<cv>'As)" is then replaced with "(<code>"(map (lambda (A) (array-broadcast "(<var>"A ND")")) "(<var>'As)")")
              ", the array arguments broadcast to "(<cv>'ND)".  It is an error if any part of this process fails due to incompatible domains.")
 
+        (<h3> (<a> id: "interval-specifiers" "Interval specifiers"))
+        (<p> "An "(<i>"interval specifier")" is a vector, each of whose entries is either a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$ or a nonnegative exact integer $u$.  Such a vector, which we'll call "(<cv>'specifier)", specifies an interval with dimension "(<code>"(vector-length "(<var>'specifier)")")" with the property: If the $i$th entry of "(<cv>'specifier)" is a list of nonnegative exact integers $\\ell$ and $u$ with $\\ell\\leq u$, then the $i$th lower bound of the interval is $\\ell$ and the $i$th upper bound of the interval is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.")
+        (<p> "Some procedures accept as certain arguments either an interval or, for convenience, an interval specifier, which is converted to an interval at procedure call time. Note that checking the correctness of a specifier argument and constructing the associated interval can take noticeable computation time (especially for small arrays) compared to passing preconstructed intervals.")
+
         (<h3> (<a> id: "convention" "Notational convention"))
         (<p> "If "(<code>(<var>'A))" is an array, then we generally define "(<code>(<var>'A_))" to be "(<code>"(array-getter "(<var>'A)")")" and  "(<code>(<var>'A!))" to be "(<code>"(array-setter "(<var>'A)")")".  The latter notation is motivated by the general Scheme convention that the names of procedures that modify the contents of data structures end in "(<code>(<var>"!"))", while the notation for the getter of an array is motivated by the TeX notation for subscripts.  See particularly the "(<a> href: "#Haar" "Haar transform")" example.")
 
@@ -576,7 +581,7 @@ So we had to make some decisions about how to broadcast generalized arrays and a
         (<h2> (<a> id: "Miscellaneous" "Miscellaneous procedures"))
         (<p> "This document refers to "(<i> 'translations)", "(<i> 'permutations)", and "(<i>"interval specifiers")".
  A translation is a vector of exact integers.  A permutation of dimension $n$
-is a vector whose entries are the exact integers $0,1,\\ldots,n-1$, each occurring once, in any order.  "(<a> id: "interval-specifier" "An interval specifier is a vector, each entry of which is either a nonnegative exact integer $u$ or a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$."))
+is a vector whose entries are the exact integers $0,1,\\ldots,n-1$, each occurring once, in any order.  An interval specifier is a vector, each entry of which is either a nonnegative exact integer $u$ or a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$.")
         (<p> "We also provide four procedures that return useful permutations.")
         (<h3> (<a> id: "miscprocedures" "Procedures"))
         (format-lambda-list '(translation? object))
@@ -633,7 +638,7 @@ of the interval.")
         (format-lambda-list '(make-interval specifier))
         (format-lambda-list '(make-interval lowers uppers))
         (<p> "Creates an interval.")
-        (<p> "When given one argument, assumes that "(<cv>'specifier)" is an "(<a> href: "#interval-specifier" "interval specifier")", that is, a vector each of whose elements is either a nonnegative exact integer $u$ or a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$. In this case "(<code>'make-interval)" returns an interval of dimension "(<code>"(vector-length "(<var>'specifier)")")" with the following properties: If the $i$th entry of "(<cv>'specifier)" is a list of nonnegative exact integers $\\ell$ and $u$ with $\\ell\\leq u$, then the $i$th lower bound of the result is $\\ell$ and the $i$th upper bound of the result is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.")
+        (<p> "When given one argument, assumes that "(<cv>'specifier)" is an "(<a> href: "#interval-specifiers" "interval specifier")", that is, a vector each of whose elements is either a nonnegative exact integer $u$ or a list of two exact integers $\\ell$ and $u$ with $\\ell\\leq u$. In this case "(<code>'make-interval)" returns an interval of dimension "(<code>"(vector-length "(<var>'specifier)")")" with the following properties: If the $i$th entry of "(<cv>'specifier)" is a list of nonnegative exact integers $\\ell$ and $u$ with $\\ell\\leq u$, then the $i$th lower bound of the result is $\\ell$ and the $i$th upper bound of the result is $u$; otherwise the $i$th lower bound is $0$ and the $i$th upper bound is $u$.")
         (<p> "When given two arguments, assumes that "(<cv>'lowers)" and "(<cv>'uppers)" are vectors of the same length, each containing exact integers with "(<code>"(<= (vector-ref "(<var>"lowers")" i) (vector-ref "(<var>"uppers")" i))")" for all "(<code>'i)". In this case "(<code>'make-interval)" returns an interval with lower bounds "(<cv>'lowers)" and upper bounds "(<cv>'uppers)".")
         (<p> "It is an error of the arguments do not satisfy these assumptions.")
         (<p> (<b> "Example: "))(<pre>(<code>"(let ((A (make-interval '#(3 (1 4))))
@@ -641,7 +646,7 @@ of the interval.")
   (interval= A B))   ;; => #t"))
 
         (format-lambda-list '(interval->specifier interval) 'interval-rarrow-specifier)
-        (<p> "Assumes that the argument "(<cv>'interval)" is an interval.  Returns an "(<a> href: "#interval-specifier" "interval specifier")" from which "(<code>'make-interval)" can recreate the argument.  It is an error if "(<cv>'interval)" is not an interval.")
+        (<p> "Assumes that the argument "(<cv>'interval)" is an interval.  Returns an "(<a> href: "#interval-specifiers" "interval specifier")" from which "(<code>'make-interval)" can recreate the argument.  It is an error if "(<cv>'interval)" is not an interval.")
         (<p>(<b> "Example: ")(<pre>(<code>"
 (let ((A (make-interval '#(0 1 0) '#(3 8 2))))
   (pretty-print (interval->specifier A))) ;; => #(3 (1 8) 2)")))
@@ -1241,6 +1246,7 @@ manipulate exact integer values between -2"(<sup>(<var> 'X)"-1")" and
 (<h3> (<a> id: "arrayprocedures" "Procedures"))
 
 (format-lambda-list '(make-array interval getter #\[ setter #\]))
+(<p> "The first argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Assume first that the optional argument "(<code>'setter)" is not given.")
 (<p> "If "(<code>(<var> 'interval))" is an interval and "(<code>(<var> 'getter))" is a procedure from
 "(<code>(<var> 'interval))" to Scheme objects, then "(<code> 'make-array)" returns an array with domain "(<code>(<var> 'interval))"
@@ -1390,7 +1396,7 @@ if "(<code>(<var> 'array))" is not a mutable array.")
 
 (format-lambda-list '(make-specialized-array interval #\[ storage-class #\[ initial-value #\] #\]))
 (<p> "Constructs a mutable specialized array from its arguments.")
-(<p> (<code>(<var>'interval))" must be given an interval. If given, "(<code>(<var>'storage-class))" must be a storage class; if it is not given, it defaults to "(<code>'generic-storage-class)". If given, "(<code>(<var>'initial-value))" must be a value that can be manipulated by "(<code>(<var>'storage-class))"; if it is not given, it defaults to "(<code>"(storage-class-default "(<var>'storage-class)")")".")
+(<p> (<code>(<var>'interval))" must be an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is converted to an interval. If given, "(<code>(<var>'storage-class))" must be a storage class; if it is not given, it defaults to "(<code>'generic-storage-class)". If given, "(<code>(<var>'initial-value))" must be a value that can be manipulated by "(<code>(<var>'storage-class))"; if it is not given, it defaults to "(<code>"(storage-class-default "(<var>'storage-class)")")".")
 
 (<p>"The body of the result is constructed as ")
 (<pre>
@@ -1657,6 +1663,7 @@ if "(<code>(<var> 'array))" is not a mutable array.")
      " when all the array arguments are packed.")
 
 (format-lambda-list '(specialized-array-share array new-domain new-domain->old-domain))
+(<p> "The second argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Constructs a new specialized array that shares the body of the specialized array "(<code>(<var> 'array))".
 Returns an object that is behaviorally equivalent to a specialized array with the following fields:")
 (<pre>
@@ -1904,6 +1911,7 @@ of whose elements is itself an (immutable) array and ")
 1"))
 
 (format-lambda-list '(array-extract array interval))
+(<p> "The second argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Returns a new array with the same getter (and setter, if appropriate) of the first argument, defined on the second argument.")
 (<p> "Assumes that "(<code>(<var> 'array))" is an array and "(<code>(<var> 'interval))" is an interval that is a sub-interval of "(<code> "(array-domain "(<var> 'array)")")".  If "(<code>(<var>'array))" is a specialized array, then returns ")
 (<pre>
@@ -2385,6 +2393,7 @@ insert axis 2:
  1 2 1 => 5"))
 
 (format-lambda-list '(array-broadcast array new-domain))
+(<p> "The second argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Assumes that "(<cv>'array)" is an array and "(<cv>'new-domain)" is an interval for which "(<code>"(compute-broadcast-interval (array-domain "(<var>'array)") "(<var>'new-domain)")")" returns "(<cv>'new-domain)" itself.")
 (<p> "If "(<cv>'array)" is a generalized array, then it is assumed that "(<code>"(interval-volume (array-domain "(<var>'array)"))")
      " is the same as "(<code>"(interval-volume "(<var>'new-domain)")")".  This necessarily means that "(<var>'new-domain)
@@ -2853,6 +2862,7 @@ We attempt to compute this in floating-point arithmetic in two ways. In the firs
 (8 6 4 2)"))
 
 (format-lambda-list '(list->array interval list #\[ storage-class #\[ mutable? #\] #\]) 'list-rarrow-array)
+(<p> "The first argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Assumes that "
      (<code>(<var> 'list))" is a list, "
      (<code>(<var> 'interval))" is an interval with volume the same as the length of "(<code>(<var> 'list))",  "
@@ -2996,6 +3006,7 @@ B:
 #(8 6 4 2)"))
 
 (format-lambda-list '(vector->array interval vector #\[ storage-class  #\[ mutable? #\] #\]) 'vector-rarrow-array)
+(<p> "The first argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Assumes that "
      (<code>(<var> 'vector))" is a vector, "
      (<code>(<var> 'interval))" is an interval with volume the same as the length of "(<code>(<var> 'v))",  "
@@ -3484,6 +3495,7 @@ A after assignment:
 (<p>(<b> "Note: ")"In the sample implementation, checking whether the multi-indices are exact integers and within the domain of the array, and checking whether the value is appropriate for storage into the array, is delegated to the underlying definition of the array argument.  If the first argument is a  specialized array, then these items are checked.  If it is a generalized array, it is up to the programmer whether to define the getter and setter of the array to check the correctness of the arguments.")
 
 (format-lambda-list '(specialized-array-reshape array interval #\[ copy-on-failure? #f #\]))
+(<p> "The second argument is assumed to be either an interval or an "(<a> href: "#interval-specifiers" "interval specifier")", which is then converted to an interval.")
 (<p> "Assumes that "(<code>(<var>'array))" is a specialized array, "(<code>(<var>'interval))" is an interval with the same volume as "(<code>"(array-domain "(<var>'array)")")", and "(<code>(<var>'copy-on-failure?))", if given, is a boolean.")
 (<p> "If there is an affine map that takes the multi-indices in "(<code>(<var>'interval))" to the cells in "(<code>"(array-body "(<var>'array)")")" storing the elements of "(<code>(<var>'array))" in lexicographical order, "(<code>'specialized-array-reshape)" returns a new specialized array, with the same body and elements as "(<code>(<var>'array))" and domain "(<code>(<var>'interval))".  The result inherits its mutability from "(<code>(<var>'array))".")
 (<p> "If there is not an affine map that takes the multi-indices in "(<code>(<var>'interval))" to the cells storing the elements of "(<code>(<var>'array))" in lexicographical order and "(<code>(<var>'copy-on-failure?))" is "(<code>'#t)", then returns a specialized array copy of "(<code>(<var>'array))" with domain "(<code>(<var>'interval))", storage class "(<code>"(array-storage-class "(<var>'array)")")" and mutability "(<code>"(mutable-array? "(<var>'array)")")".")

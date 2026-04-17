@@ -967,16 +967,16 @@ OTHER DEALINGS IN THE SOFTWARE.
                     message)))
           storage-class-names)
 
-(pp "array error tests")
+(pp "make-array error tests")
 
 (test (make-array 1 values)
-      "make-array: The first argument is not an interval: ")
+      "make-array: The first argument does not determine an interval: ")
 
 (test (make-array (make-interval '#(3) '#(4)) 1)
       "make-array: The second argument is not a procedure: ")
 
 (test (make-array 1 values values)
-      "make-array: The first argument is not an interval: ")
+      "make-array: The first argument does not determine an interval: ")
 
 (test (make-array (make-interval '#(3) '#(4)) 1 values)
       "make-array: The second argument is not a procedure: ")
@@ -988,6 +988,12 @@ OTHER DEALINGS IN THE SOFTWARE.
   (and (interval= (array-domain array1)
                   (array-domain array2))
        (array-every compare array1 array2)))
+
+(pp "make-array tests for specifiers")
+
+(test (myarray= (make-array (make-interval '#((2 20) 5)) list)
+                (make-array '#((2 20) 5) list))
+      #t)
 
 (pp "array-domain and array-getter error tests")
 
@@ -1122,7 +1128,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (pp "make-specialized-array error tests")
 
 (test (make-specialized-array  'a)
-      "make-specialized-array: The first argument is not an interval: ")
+      "make-specialized-array: The first argument does not determine an interval: ")
 
 (test (make-specialized-array (make-interval '#(0) '#(10)) 'a)
       "make-specialized-array: The second argument is not a storage-class: ")
@@ -1136,6 +1142,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; let's test a few more
 
 (test (array-every (lambda (x) (eqv? x 42)) (make-specialized-array (make-interval '#(10)) u8-storage-class 42))
+      #t)
+
+(test (array-every (lambda (x) (eqv? x 42)) (make-specialized-array '#(10) u8-storage-class 42))
       #t)
 
 (pp "make-specialized-array-from-data error tests")
@@ -2993,10 +3002,10 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (specialized-array-share (make-specialized-array (make-interval '#(1) '#(2)))
                                1 1)
-      "specialized-array-share: The second argument is not an interval: ")
+      "specialized-array-share: The second argument does not determine an interval: ")
 
 (test (specialized-array-share (make-specialized-array (make-interval '#(1) '#(2)))
-                               (make-interval '#(0) '#(1))
+                               '#(1)
                                1)
       "specialized-array-share: The third argument is not a procedure: ")
 
@@ -3839,7 +3848,9 @@ OTHER DEALINGS IN THE SOFTWARE.
       "array-broadcast: The first argument is not an array: " )
 
 (test (array-broadcast (array-copy (make-array (make-interval '#()) list)) 'a)
-      "array-broadcast: The second argument is not an interval: ")
+      "array-broadcast: The second argument does not determine an interval: ")
+
+;;; tests with the second argument an interval
 
 (test (array-broadcast (array-copy (make-array (make-interval '#(10)) list)) (make-interval '#(2 2)))
       "array-broadcast: The first argument cannot be broadcast to the second argument: ")
@@ -3853,8 +3864,26 @@ OTHER DEALINGS IN THE SOFTWARE.
 (test (array-broadcast (make-array (make-interval '#(10)) list) (make-interval '#(10 10)))
       "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: ")
 
+;; tests with the second argument an interval specifier
+
+(test (array-broadcast (array-copy (make-array '#(10) list)) '#(2 2))
+      "array-broadcast: The first argument cannot be broadcast to the second argument: ")
+
+(test (array-broadcast (array-copy (make-array '#(10) list)) '#())
+      "array-broadcast: The first argument cannot be broadcast to the second argument: ")
+
+(test (array-broadcast (make-array '#(10) list) '#())
+      "array-broadcast: The first argument cannot be broadcast to the second argument: ")
+
+(test (array-broadcast (make-array '#(10) list) '#(10 10))
+      "array-broadcast: Cannot broadcast a generalized array to a domain with more elements: ")
+
 (test (myarray= (array-broadcast (list->array (make-interval '#(2 1 3)) (iota 6)) (make-interval '#(2 5 3)))
                 (array-insert-axis (list->array (make-interval '#(2 3)) (iota 6)) 1 5))
+      #t)
+
+(test (myarray= (array-broadcast (list->array '#(2 1 3) (iota 6)) '#(2 5 3))
+                (array-insert-axis (list->array '#(2 3) (iota 6)) 1 5))
       #t)
 
 (define (my-array-broadcast array new-domain)
@@ -4206,7 +4235,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (array-extract (make-array (make-interval '#(0 0) '#(1 1)) list)
                      'a)
-      "array-extract: The second argument is not an interval: ")
+      "array-extract: The second argument does not determine an interval: ")
+
+;;; tests with intervals
 
 (test (array-extract 'a (make-interval '#(0 0) '#(1 1)))
       "array-extract: The first argument is not an array: ")
@@ -4217,6 +4248,27 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (array-extract (make-array (make-interval '#(0 0) '#(1 1)) list)
                      (make-interval '#(0 0) '#(1 3)))
+      "array-extract: The second argument (an interval) is not a subset of the domain of the first argument (an array): ")
+
+(test (array-extract (make-array '#((0 1) (0 1)) list)
+                     '#((0 1)))
+      "array-extract: The dimension of the second argument (an interval) does not equal the dimension of the domain of the first argument (an array): ")
+
+(test (array-extract (make-array (make-interval '#(0 0) '#(1 1)) list)
+                     '#(1 3))
+      "array-extract: The second argument (an interval) is not a subset of the domain of the first argument (an array): ")
+
+;;; tests with specifiers
+
+(test (array-extract 'a '#(1 1))
+      "array-extract: The first argument is not an array: ")
+
+(test (array-extract (make-array '#((0 1) (0 1)) list)
+                     '#((0 1)))
+      "array-extract: The dimension of the second argument (an interval) does not equal the dimension of the domain of the first argument (an array): ")
+
+(test (array-extract (make-array (make-interval '#(0 0) '#(1 1)) list)
+                     '#(1 3))
       "array-extract: The second argument (an interval) is not a subset of the domain of the first argument (an array): ")
 
 (let* ((A (list->array (make-interval '#(10)) (iota 10)  generic-storage-class #f)) ;; not mutable
@@ -4269,6 +4321,83 @@ OTHER DEALINGS IN THE SOFTWARE.
                               (array-getter B-prime)
                               (array-setter B-prime))))
          (mut-B-extract (array-extract mut-B subdomain)))
+    ;; test that the extracts are the same kind of arrays as the original
+    (test (specialized-array? spec-A)
+          #t)
+    (test (specialized-array? spec-A-extract)
+          #t)
+    (test (and (mutable-array? mut-A)
+               (not (specialized-array? mut-A)))
+          #t)
+    (test (and (mutable-array? mut-A-extract)
+               (not (specialized-array? mut-A-extract)))
+          #t)
+    (test (and (array? immutable-A)
+               (not (mutable-array? immutable-A)))
+          #t)
+    (test (and (array? immutable-A-extract)
+               (not (mutable-array? immutable-A-extract)))
+          #t)
+    (test (array-domain spec-A-extract)
+          subdomain)
+    (test (array-domain mut-A-extract)
+          subdomain)
+    (test (array-domain immutable-A-extract)
+          subdomain)
+    ;; test that applying the original setter to arguments in
+    ;; the subdomain gives the same answer as applying the
+    ;; setter of the extracted array to the same arguments.
+    (for-each (lambda (A B A-extract B-extract)
+                (let ((A-setter (array-setter A))
+                      (B-extract-setter (array-setter B-extract)))
+                  (do ((i 0 (fx+ i 1)))
+                      ((fx= i 100)
+                       (test (myarray= spec-A spec-B)
+                             #t)
+                       (test (myarray= spec-A-extract spec-B-extract)
+                             #t))
+                    (if (not (interval-empty? subdomain))
+                        (call-with-values
+                            (lambda ()
+                              (random-multi-index subdomain))
+                          (lambda multi-index
+                            (let ((val (test-random-real)))
+                              (apply A-setter val multi-index)
+                              (apply B-extract-setter val multi-index))))))))
+              (list spec-A mut-A)
+              (list spec-B mut-B)
+              (list spec-A-extract mut-A-extract)
+              (list spec-B-extract mut-B-extract))))
+
+(next-test-random-source-state!)
+
+;;; And now we do it all over again with specifiers
+;;; instead of intervals.
+
+(do ((i 0 (fx+ i 1)))
+    ((fx= i random-tests))
+  (let* ((domain (random-interval))
+         (subdomain (interval->specifier (random-subinterval domain)))
+         (spec-A (array-copy (make-array domain list)))
+         (spec-A-extract (array-extract spec-A subdomain))
+         (mut-A (let ((A-prime (array-copy spec-A)))
+                  (make-array domain
+                              (array-getter A-prime)
+                              (array-setter A-prime))))
+         (mut-A-extract (array-extract mut-A subdomain))
+         (immutable-A (let ((A-prime (array-copy spec-A)))
+                        (make-array domain
+                                    (array-getter A-prime))))
+         (immutable-A-extract (array-extract immutable-A subdomain))
+         (spec-B (array-copy (make-array domain list)))
+         (spec-B-extract (array-extract spec-B subdomain))
+         (mut-B (let ((B-prime (array-copy spec-B)))
+                  (make-array domain
+                              (array-getter B-prime)
+                              (array-setter B-prime))))
+         (mut-B-extract (array-extract mut-B subdomain))
+         ;; and now we return subdomain to be an interval instead of a specifier
+         (subdomain (make-interval subdomain)))
     ;; test that the extracts are the same kind of arrays as the original
     (test (specialized-array? spec-A)
           #t)
@@ -4765,7 +4894,9 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (for-each (lambda (function arg name name2)
             (test (function 'b arg)
-                  (string-append name "The first argument is not an interval: "))
+                  (string-append name "The first argument does not determine an interval: "))
+            (test (array? (function (make-interval '#()) arg)) #t)
+            (test (array? (function '#() arg)) #t)
             (test (function (make-interval '#(0) '#(1)) 'b)
                   (string-append name "The second argument is not a " name2 ": "))
             (test (function (make-interval '#(0) '#(1)) arg 'a)
@@ -4811,11 +4942,13 @@ OTHER DEALINGS IN THE SOFTWARE.
            (l (array->list Array))
            (mutable? (zero? (test-random-integer 2)))
            (new-list-array (list->array domain l storage-class mutable?))
-           (new-vector-array (vector->array domain (list->vector l) storage-class mutable?)))
-      (test (myarray= Array new-list-array)
-            #t)
-      (test (myarray= Array new-vector-array)
-            #t))))
+           (new-list-array-specifier (list->array (interval->specifier domain) l storage-class mutable?))
+           (new-vector-array (vector->array domain (list->vector l) storage-class mutable?))
+           (new-vector-array-specifier (vector->array (interval->specifier domain) (list->vector l) storage-class mutable?)))
+      (test (myarray= Array new-list-array) #t)
+      (test (myarray= Array new-list-array-specifier) #t)
+      (test (myarray= Array new-vector-array) #t)
+      (test (myarray= Array new-vector-array-specifier) #t))))
 
 (next-test-random-source-state!)
 
@@ -4988,13 +5121,21 @@ OTHER DEALINGS IN THE SOFTWARE.
       "specialized-array-reshape: The first argument is not a specialized array: ")
 
 (test (specialized-array-reshape A-ref 'a)
-      "specialized-array-reshape: The second argument is not an interval ")
+      "specialized-array-reshape: The second argument does not determine an interval ")
 
 (test (specialized-array-reshape A-ref (make-interval '#(5)))
       "specialized-array-reshape: The volume of the domain of the first argument is not equal to the volume of the second argument: ")
 
+(test (specialized-array-reshape A-ref '#(5))
+      "specialized-array-reshape: The volume of the domain of the first argument is not equal to the volume of the second argument: ")
+
+(test (specialized-array-reshape A-ref '#(100) 'a)
+      "specialized-array-reshape: The third argument is not a boolean: ")
+
 (test (specialized-array-reshape A-ref (make-interval '#(100)) 'a)
       "specialized-array-reshape: The third argument is not a boolean: ")
+
+;;; tests with interval arguments
 
 (let ((array (array-copy (make-array (make-interval '#(2 1 3 1)) list))))
   (test (array->list array)
@@ -5044,6 +5185,58 @@ OTHER DEALINGS IN THE SOFTWARE.
   (test (array->list (specialized-array-reshape array (make-interval '#(4))))
         (array->list array)))
 
+;;; tests with specifier arguments
+
+(let ((array (array-copy (make-array (make-interval '#(2 1 3 1)) list))))
+  (test (array->list array)
+        (array->list (specialized-array-reshape array '#(6)))))
+
+(let ((array (array-copy (make-array (make-interval '#(2 1 3 1)) list))))
+  (test (array->list array)
+        (array->list (specialized-array-reshape array '#(3 2)))))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)))))
+  (test (array->list array)
+        (array->list (specialized-array-reshape array '#(6)))))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)))))
+  (test (array->list (specialized-array-reshape array '#(3 2)))
+        (array->list array)))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t))))
+  (test (array->list (specialized-array-reshape array '#(3 2)))
+        (array->list array)))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t))))
+  (test (array->list (specialized-array-reshape array '#(3 1 2)))
+        (array->list array)))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t))))
+  (test (array->list (specialized-array-reshape array '#(1 1 1 3 2)))
+        (array->list array)))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t))))
+  (test (array->list (specialized-array-reshape array '#(3 2 1 1 1)))
+        (array->list array)))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t))))
+  (test (array->list (specialized-array-reshape array '#(3 1 1 2)))
+        (array->list array)))
+
+(let ((array (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t))))
+  (test (array->list (specialized-array-reshape array  '#(3 1 2 1)))
+        (array->list array)))
+
+(let ((array (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 4 1)) list)) '#(#f #f #f #t)) '#(1 1 2 1))))
+  (test (array->list (specialized-array-reshape array '#(4)))
+        (array->list array)))
+
+(let ((array (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 4 1)) list)) '#(#t #f #t #t)) '#(1 1 2 1))))
+  (test (array->list (specialized-array-reshape array '#(4)))
+        (array->list array)))
+
+;;; tests with intervals
+
 (test (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) (make-interval '#(6)))
       "specialized-array-reshape: Requested reshaping is impossible: ")
 
@@ -5064,6 +5257,30 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 (test (array? (specialized-array-reshape (make-specialized-array (make-interval '#(1 2 0 4)))
                                          (make-interval '#(2 0 4))))
+      #t)
+
+;;; tests with specifiers
+
+(test (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) '#(6))
+      "specialized-array-reshape: Requested reshaping is impossible: ")
+
+(test (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) '#(3 2))
+      "specialized-array-reshape: Requested reshaping is impossible: ")
+
+(test (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #t #f)) '#(6))
+      "specialized-array-reshape: Requested reshaping is impossible: ")
+
+(test (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #t #t)) '#(3 2))
+      "specialized-array-reshape: Requested reshaping is impossible: ")
+
+(test (specialized-array-reshape (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t)) '#(1 1 2 1)) '#(4))
+      "specialized-array-reshape: Requested reshaping is impossible: ")
+
+(test (specialized-array-reshape (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 4 1)) list)) '#(#f #f #t #t)) '#(1 1 2 1)) '#(4))
+      "specialized-array-reshape: Requested reshaping is impossible: ")
+
+(test (array? (specialized-array-reshape (make-specialized-array (make-interval '#(1 2 0 4)))
+                                         '#(2 0 4)))
       #t)
 
 (pp "Test code from the SRFI document")
@@ -6312,7 +6529,6 @@ that computes the componentwise products when we need them, the times are
      (list (array-extract a (make-interval `#((,k ,(+ k 1)) ,n)))
            (array-extract a (make-interval `#(,k ,n)))
            (array-extract a (make-interval `#((,(+ k 1) ,m) ,n)))))))
-
 
 (let* ((a (make-array (make-interval '#(4 6)) list)))
   (pretty-print (array->list* a))
