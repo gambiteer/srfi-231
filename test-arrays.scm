@@ -6521,14 +6521,14 @@ that computes the componentwise products when we need them, the times are
           #t)))
 
 (define (move-row-to-top a k)
-  ;; Move the k'th row of the two-dimensional spreadsheet a to the top
+  ;; Move row k of the two-dimensional spreadsheet a to the top
   (let ((m (interval-upper-bound (array-domain a) 0))
         (n (interval-upper-bound (array-domain a) 1)))
     (array-append
      0
-     (list (array-extract a (make-interval `#((,k ,(+ k 1)) ,n)))
-           (array-extract a (make-interval `#(,k ,n)))
-           (array-extract a (make-interval `#((,(+ k 1) ,m) ,n)))))))
+     (list (array-extract a `#((,k ,(+ k 1)) ,n))
+           (array-extract a `#(,k ,n))
+           (array-extract a `#((,(+ k 1) ,m) ,n))))))
 
 (let* ((a (make-array (make-interval '#(4 6)) list)))
   (pretty-print (array->list* a))

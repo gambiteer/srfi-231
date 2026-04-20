@@ -3318,14 +3318,14 @@ A after assignment:
 (<p>(<b>"Example:")" Given a two-dimensional array $a$ interpreted as a spreadsheet, with the rows and columns indexed starting at 0, one might want to make a new array with row $k$ moved to be the top row.  Then one could do:")
 (<pre>(<code>
 "(define (move-row-to-top a k)
-  ;; Move the k'th row of the two-dimensional spreadsheet a to the top
+  ;; Move row k of the two-dimensional spreadsheet a to the top
   (let ((m (interval-upper-bound (array-domain a) 0))
         (n (interval-upper-bound (array-domain a) 1)))
     (array-append
      0
-     (list (array-extract a (make-interval `#((,k ,(+ k 1)) ,n)))
-           (array-extract a (make-interval `#(,k ,n)))
-           (array-extract a (make-interval `#((,(+ k 1) ,m) ,n)))))))
+     (list (array-extract a `#((,k ,(+ k 1)) ,n))     ;; row k
+           (array-extract a `#(,k ,n))                ;; earlier rows
+           (array-extract a `#((,(+ k 1) ,m) ,n)))))) ;; later rows
 
 (let* ((a (make-array (make-interval '#(4 6)) list)))
   (pretty-print (array->list* a))
