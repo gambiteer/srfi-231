@@ -1239,9 +1239,7 @@
     (interval-for-each (lambda args
                          (let ((item (apply source-getter args)))
                            (if (checker item)
-                               (apply destination-setter
-                                      (apply source-getter args)
-                                      args)
+                               (apply destination-setter item args)
                                (error "array-assign!: Can't store item into array: " item destination))))
                        domain)))
 

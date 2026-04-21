@@ -86,6 +86,55 @@ OTHER DEALINGS IN THE SOFTWARE.
   (define-macro (test-error expr value)
     `(test ,expr ,value)))
 
+;;; This tests whether each element of an array is accessed only once
+;;; in various array routines
+
+(let* ((original-make-array make-array)
+       (make-array
+        (case-lambda
+         ((specifier getter)
+          (if (and (interval? specifier)
+                   (procedure? getter))
+              (let* ((tracker
+                      (make-specialized-array specifier u1-storage-class 0))
+                     (tracker_
+                      (array-getter tracker))
+                     (tracker!
+                      (array-setter tracker))
+                     (new-getter
+                      (lambda args
+                        (if (eqv? (apply tracker_ args) 0)
+                            (begin
+                              (apply tracker! 1 args)
+                              (apply getter args))
+                            (error "getter applied more than once: " specifier getter)))))
+                (original-make-array specifier new-getter))
+              ;; have original make-array handle the error
+              (original-make-array specifier getter)))
+         ((specifier getter setter)
+          (original-make-array specifier getter setter)))))
+  (let* ((A (array-copy (make-array (make-interval '#(2 2)) list) generic-storage-class #t))
+         (B (make-array (make-interval '#(2 2)) list))
+         (ignore (array-assign! A B))
+         (B (make-array (make-interval '#(2 2)) list))
+         (ignore (array-append 0 (list A B)))
+         (B (make-array (make-interval '#(2 2)) list))
+         (ignore (array-stack 0 (list A B)))
+         (B (make-array (make-interval '#(2 2)) list))
+         (ignore (array-decurry (make-array (make-interval '#(2)) (lambda (i) (list-ref (list A B) i)))))
+         (B (make-array (make-interval '#(2 2)) list))
+         (B* (make-array (make-interval '#(2 2)) list))
+         (ignore (array-block (make-array (make-interval '#(2 2))
+                                          (lambda (i j)
+                                            (list-ref (list-ref (list (list A B)
+                                                                      (list A B*))
+                                                                i)
+                                                      j)))))
+         (B (make-array (make-interval '#(2 2)) list))
+         (ignore (array-copy B))
+         )
+    #t))
+
 (declare (inlining-limit 0))
 (define random-tests 100)
 (set! random-tests random-tests)
