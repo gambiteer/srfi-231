@@ -1271,6 +1271,20 @@
       array
       (%%generalized-array->specialized-array array storage-class #f)))
 
+(define (%%array-copy array storage-class mutable? call/cc-safe?)
+  (if (or (specialized-array? array) (not call/cc-safe?))
+      (let ((result
+             (%%make-specialized-array (%%array-domain array)
+                                       storage-class
+                                       (storage-class-default storage-class))))
+        (array-assign! result array)
+        (if (not mutable?)
+            (%%array-freeze! result)
+            result))
+      (%%generalized-array->specialized-array array
+                                              storage-class
+                                              mutable?)))
+
 (define array-copy
   (case-lambda
    ((array)
@@ -1282,20 +1296,20 @@
         (array-copy array storage-class (mutable-array? array))
         (array-copy array storage-class (specialized-array-default-mutable?))))
    ((array storage-class mutable?)
-    (if (specialized-array? array)
-        (let ((result
-               (%%make-specialized-array (%%array-domain array)
-                                         storage-class
-                                         (storage-class-default storage-class))))
-          (array-assign! result array)
-          (if (not mutable?)
-              (%%array-freeze! result)
-              result))
-        (%%generalized-array->specialized-array array
-                                                storage-class
-                                                mutable?)))))
+    (%%array-copy array storage-class mutable? #t))))
 
-(define array-copy! array-copy)
+(define array-copy!
+  (case-lambda
+   ((array)
+    (if (specialized-array? array)
+        (array-copy! array (array-storage-class array) (mutable-array? array))
+        (array-copy! array generic-storage-class (specialized-array-default-mutable?))))
+   ((array storage-class)
+    (if (specialized-array? array)
+        (array-copy! array storage-class (mutable-array? array))
+        (array-copy! array storage-class (specialized-array-default-mutable?))))
+   ((array storage-class mutable?)
+    (%%array-copy array storage-class mutable? #f))))
 
 (define (%%compose-indexers old-indexer new-domain new-domain->old-domain)
   (if (interval-empty? new-domain)
@@ -1793,6 +1807,36 @@
                       (apply B_ (drop args dim_A))))))
     (make-array result-domain result-getter)))
 
+(define (%%array-stack k arrays storage-class mutable? call/cc-safe?)
+  (let* ((arrays
+          (if (not call/cc-safe?)
+              (list-copy arrays)
+              (map (lambda (A)
+                     (%%->specialized-array A storage-class))
+                   arrays)))
+         (number-of-arrays
+          (length arrays))
+         (domain
+          (array-domain (car arrays)))
+         (result-domain
+          (interval-insert-axis domain k number-of-arrays))
+         (result-array
+          (%%make-specialized-array result-domain
+                                    storage-class
+                                    (storage-class-default storage-class)))
+         (permuted-and-curried-result
+          (array-curry (array-permute result-array (index-first (interval-dimension result-domain) k))
+                       (interval-dimension domain))))
+    (array-for-each array-assign!
+                    permuted-and-curried-result
+                    (list->array (make-interval (vector number-of-arrays))
+                                 arrays
+                                 generic-storage-class
+                                 #f))
+    (if (not mutable?)
+        (%%array-freeze! result-array)
+        result-array)))
+
 (define array-stack
   (case-lambda
    ((k arrays)
@@ -1800,36 +1844,46 @@
    ((k arrays storage-class)
     (array-stack k arrays storage-class (specialized-array-default-mutable?)))
    ((k arrays storage-class mutable?)
-    (let* ((arrays
-            (list-copy arrays))
-           (arrays
-            (map (lambda (A)
-                   (%%->specialized-array A storage-class))
-                 arrays))
-           (number-of-arrays
-            (length arrays))
-           (domain
-            (array-domain (car arrays)))
-           (result-domain
-            (interval-insert-axis domain k number-of-arrays))
-           (result-array
-            (%%make-specialized-array result-domain
-                                      storage-class
-                                      (storage-class-default storage-class)))
-           (permuted-and-curried-result
-            (array-curry (array-permute result-array (index-first (interval-dimension result-domain) k))
-                         (interval-dimension domain))))
-      (array-for-each array-assign!
-                      permuted-and-curried-result
-                      (list->array (make-interval (vector number-of-arrays))
-                                   arrays
-                                   generic-storage-class
-                                   #f))
-      (if (not mutable?)
-          (%%array-freeze! result-array)
-          result-array)))))
+    (%%array-stack k arrays storage-class mutable? #t))))
 
-(define array-stack! array-stack)
+(define array-stack!
+  (case-lambda
+   ((k arrays)
+    (array-stack! k arrays generic-storage-class (specialized-array-default-mutable?)))
+   ((k arrays storage-class)
+    (array-stack! k arrays storage-class (specialized-array-default-mutable?)))
+   ((k arrays storage-class mutable?)
+    (%%array-stack k arrays storage-class mutable? #f))))
+
+(define (%%array-decurry A storage-class mutable? call/cc-safe?)
+  (let* ((A
+          (cond (call/cc-safe?
+                 (%%->specialized-array (array-map (lambda (A)
+                                                     (%%->specialized-array A storage-class))
+                                                   A)
+                                        generic-storage-class))
+                ((specialized-array? A)
+                 A)
+                (else
+                 (array-copy! A))))
+         (A_
+          (array-getter A))
+         (A_D
+          (array-domain A))
+         (first-domain
+          (array-domain (apply A_ (interval-lower-bounds->list A_D))))
+         (result-domain
+          (interval-cartesian-product A_D first-domain))
+         (result
+          (%%make-specialized-array result-domain
+                                    storage-class
+                                    (storage-class-default storage-class)))
+         (curried-result
+          (array-curry result (interval-dimension first-domain))))
+    (array-for-each array-assign! curried-result A)
+    (if (not mutable?)
+        (%%array-freeze! result)
+        result)))
 
 (define array-decurry
   (case-lambda
@@ -1838,31 +1892,70 @@
    ((A storage-class)
     (array-decurry A storage-class (specialized-array-default-mutable?)))
    ((A storage-class mutable?)
-    (let* ((A
-            (%%->specialized-array (array-map (lambda (A)
-                                                (%%->specialized-array A storage-class))
-                                              A)
-                                   generic-storage-class))
-           (A_
-            (array-getter A))
-           (A_D
-            (array-domain A))
-           (first-domain
-            (array-domain (apply A_ (interval-lower-bounds->list A_D))))
-           (result-domain
-            (interval-cartesian-product A_D first-domain))
-           (result
-            (%%make-specialized-array result-domain
-                                      storage-class
-                                      (storage-class-default storage-class)))
-           (curried-result
-            (array-curry result (interval-dimension first-domain))))
-      (array-for-each array-assign! curried-result A)
-      (if (not mutable?)
-          (%%array-freeze! result)
-          result)))))
+    (%%array-decurry A storage-class mutable? #t))))
 
-(define array-decurry! array-decurry)
+(define array-decurry!
+  (case-lambda
+   ((A)
+    (array-decurry! A generic-storage-class (specialized-array-default-mutable?)))
+   ((A storage-class)
+    (array-decurry! A storage-class (specialized-array-default-mutable?)))
+   ((A storage-class mutable?)
+    (%%array-decurry A storage-class mutable? #f))))
+
+(define (%%array-append k arrays storage-class mutable? call/cc-safe?)
+  (call-with-values
+      (lambda ()
+        (let loop ((result '(0))
+                   (arrays arrays))
+          (if (null? arrays)
+              (values (reverse result) (car result))
+              (let ((interval (array-domain (car arrays))))
+                (loop (cons (fx+ (car result)
+                                 (- (interval-upper-bound interval k)
+                                    (interval-lower-bound interval k)))
+                            result)
+                      (cdr arrays))))))
+    (lambda (axis-subdividers kth-size)
+      #;(pp (list array-append: axis-subdividers kth-size))
+      (let* ((arrays
+              (if call/cc-safe?
+                  (map (lambda (A)
+                         (%%->specialized-array A storage-class))
+                       arrays)
+                  (list-copy arrays)))
+             (first-array
+              (car arrays))
+             (lowers
+              ;; the domains of the arrays differ only in the kth axis
+              (interval-lower-bounds->vector (array-domain first-array)))
+             (uppers
+              (interval-upper-bounds->vector (array-domain first-array)))
+             (result
+              ;; the result array
+              (%%make-specialized-array
+               (let ()
+                 (vector-set! lowers k 0)
+                 (vector-set! uppers k kth-size)
+                 (make-interval lowers uppers))  ;; copies lowers and uppers
+               storage-class
+               (storage-class-default storage-class))))
+        #;(pp (array-domain result))
+        (let loop ((arrays arrays)
+                   (subdividers axis-subdividers))
+          (if (null? arrays)
+              ;; we've assigned every array to the appropriate subarray of result
+              (if (not mutable?)
+                  (%%array-freeze! result)
+                  result)
+              (let ((array (car arrays)))
+                (vector-set! lowers k (car subdividers))
+                (vector-set! uppers k (cadr subdividers))
+                (array-assign!
+                 (array-extract result (make-interval lowers uppers))
+                 (array-rebase array lowers))
+                (loop (cdr arrays)
+                      (cdr subdividers)))))))))
 
 (define array-append
   (case-lambda
@@ -1871,60 +1964,80 @@
    ((k arrays storage-class)
     (array-append k arrays storage-class (specialized-array-default-mutable?)))
    ((k arrays storage-class mutable?)
-    (call-with-values
-        (lambda ()
-          (let loop ((result '(0))
-                     (arrays arrays))
-            (if (null? arrays)
-                (values (reverse result) (car result))
-                (let ((interval (array-domain (car arrays))))
-                  (loop (cons (fx+ (car result)
-                                   (- (interval-upper-bound interval k)
-                                      (interval-lower-bound interval k)))
-                              result)
-                        (cdr arrays))))))
-      (lambda (axis-subdividers kth-size)
-        #;(pp (list array-append: axis-subdividers kth-size))
-        (let* ((arrays
-                (list-copy arrays))
-               (arrays
-                (map (lambda (A)
-                       (%%->specialized-array A storage-class))
-                     arrays))
-               (first-array
-                (car arrays))
-               (lowers
-                ;; the domains of the arrays differ only in the kth axis
-                (interval-lower-bounds->vector (array-domain first-array)))
-               (uppers
-                (interval-upper-bounds->vector (array-domain first-array)))
-               (result
-                ;; the result array
-                (%%make-specialized-array
-                 (let ()
-                   (vector-set! lowers k 0)
-                   (vector-set! uppers k kth-size)
-                   (make-interval lowers uppers))  ;; copies lowers and uppers
-                 storage-class
-                 (storage-class-default storage-class))))
-          #;(pp (array-domain result))
-          (let loop ((arrays arrays)
-                     (subdividers axis-subdividers))
-            (if (null? arrays)
-                ;; we've assigned every array to the appropriate subarray of result
-                (if (not mutable?)
-                    (%%array-freeze! result)
-                    result)
-                (let ((array (car arrays)))
-                  (vector-set! lowers k (car subdividers))
-                  (vector-set! uppers k (cadr subdividers))
-                  (array-assign!
-                   (array-extract result (make-interval lowers uppers))
-                   (array-rebase array lowers))
-                  (loop (cdr arrays)
-                        (cdr subdividers)))))))))))
+    (%%array-append k arrays storage-class mutable? #t))))
 
-(define array-append! array-append)
+(define array-append!
+  (case-lambda
+   ((k arrays)
+    (array-append! k arrays generic-storage-class (specialized-array-default-mutable?)))
+   ((k arrays storage-class)
+    (array-append! k arrays storage-class (specialized-array-default-mutable?)))
+   ((k arrays storage-class mutable?)
+    (%%array-append k arrays storage-class mutable? #f))))
+
+(define (%%array-block A storage-class mutable? call/cc-safe?)
+  (let* ((A
+          (cond (call/cc-safe?
+                 (%%->specialized-array (array-map (lambda (A)
+                                                     (%%->specialized-array A storage-class))
+                                                   A)
+                                        generic-storage-class))
+                ((specialized-array? A)
+                 A)
+                (else
+                 (array-copy! A))))
+         (A     (array-rebase A))
+         (A_    (array-getter A))
+         (A_D   (array-domain A))
+         (A_dim (interval-dimension A_D))
+         (ks    (list->vector (iota A_dim)))
+         (slice-offsets       ;; the indices in each direction where the "cuts" are
+          (vector-map
+           (lambda (k)        ;; the direction
+             (let* ((pencil   ;; a pencil in that direction
+                     ;; Amazingly, this works when A_dim is 1.
+                     (apply (array-getter (array-curry (array-permute A (index-last A_dim k)) 1))
+                            (make-list (fx- A_dim 1) 0)))
+                    (pencil_
+                     (array-getter pencil))
+                    (pencil-size
+                     (interval-width (array-domain pencil) 0))
+                    (result   ;; include sum of all kth interval-widths in pencil
+                     (make-vector (fx+ pencil-size 1) 0)))
+               (do ((i 0 (fx+ i 1)))
+                   ((fx= i pencil-size) result)
+                 (vector-set! result
+                              (fx+ i 1)
+                              (fx+ (vector-ref result i)
+                                   (interval-width (array-domain (pencil_ i)) k))))))
+           ks))
+         (result
+          (%%make-specialized-array
+           (make-interval
+            (vector-map (lambda (v)
+                          (vector-ref v (fx- (vector-length v) 1)))
+                        slice-offsets))
+           storage-class
+           (storage-class-default storage-class))))
+    (interval-for-each
+     (lambda multi-index
+       (let* ((vector-multi-index
+               (list->vector multi-index))
+              (corner     ;; where the subarray will sit in the result array
+               (vector-map (lambda (i k)
+                             (vector-ref (vector-ref slice-offsets k) i))
+                           vector-multi-index
+                           ks))
+              (subarray
+               (apply A_ multi-index))
+              (rebased-subarray  ;; rebase the subarray to corner
+               (array-rebase subarray corner)))
+         (array-assign! (array-extract result (array-domain rebased-subarray))
+                        rebased-subarray)))
+     A_D)
+    (if (not mutable?)
+        (%%array-freeze! result)
+        result)))
 
 (define array-block
   (case-lambda
@@ -1933,66 +2046,16 @@
    ((A storage-class)
     (array-block A storage-class (specialized-array-default-mutable?)))
    ((A storage-class mutable?)
-    (let* ((A       (array-rebase (array-copy A)))  ;; evaluate all elements of A, and make lower bounds zero
-           (A_D     (array-domain A))
-           (A_dim   (interval-dimension A_D))
-           (ks      (list->vector (iota A_dim)))
-           (slice-offsets       ;; the indices in each direction where the "cuts" are
-            (vector-map
-             (lambda (k)        ;; the direction
-               (let* ((pencil   ;; a pencil in that direction
-                       ;; Amazingly, this works when A_dim is 1.
-                       (apply (array-getter (array-curry (array-permute A (index-last A_dim k)) 1))
-                              (make-list (fx- A_dim 1) 0)))
-                      (pencil_
-                       (array-getter pencil))
-                      (pencil-size
-                       (interval-width (array-domain pencil) 0))
-                      (result   ;; include sum of all kth interval-widths in pencil
-                       (make-vector (fx+ pencil-size 1) 0)))
-                 (do ((i 0 (fx+ i 1)))
-                     ((fx= i pencil-size) result)
-                   (vector-set! result
-                                (fx+ i 1)
-                                (fx+ (vector-ref result i)
-                                     (interval-width (array-domain (pencil_ i)) k))))))
-             ks))
-           (A
-            (%%->specialized-array (array-map (lambda (A)
-                                                (%%->specialized-array A storage-class))
-                                              A)
-                                   generic-storage-class))
-           (A_
-            (array-getter A))
-           (result
-            (%%make-specialized-array
-             (make-interval
-              (vector-map (lambda (v)
-                            (vector-ref v (fx- (vector-length v) 1)))
-                          slice-offsets))
-             storage-class
-             (storage-class-default storage-class))))
-      (interval-for-each
-       (lambda multi-index
-         (let* ((vector-multi-index
-                 (list->vector multi-index))
-                (corner     ;; where the subarray will sit in the result array
-                 (vector-map (lambda (i k)
-                               (vector-ref (vector-ref slice-offsets k) i))
-                             vector-multi-index
-                             ks))
-                (subarray
-                 (apply A_ multi-index))
-                (rebased-subarray  ;; rebase the subarray to corner
-                 (array-rebase subarray corner)))
-           (array-assign! (array-extract result (array-domain rebased-subarray))
-                          rebased-subarray)))
-       A_D)
-      (if (not mutable?)
-          (%%array-freeze! result)
-          result)))))
+    (%%array-block A storage-class mutable? #t))))
 
-(define array-block! array-block)
+(define array-block!
+  (case-lambda
+   ((A)
+    (array-block! A generic-storage-class (specialized-array-default-mutable?)))
+   ((A storage-class)
+    (array-block! A storage-class (specialized-array-default-mutable?)))
+   ((A storage-class mutable?)
+    (%%array-block A storage-class mutable? #f))))
 
 (define (array-ref A . multi-index)
   (apply (array-getter A) multi-index))
