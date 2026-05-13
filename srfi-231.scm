@@ -1192,7 +1192,7 @@ manipulate exact integer values between -2"(<sup>(<var> 'X)"-1")" and
 2"(<sup> (<var> 'X)"-1")"-1 inclusive),
  "(<code> "u"(<var> 'X)"-storage-class")" for "(<code>(<var> 'X))"=1, 8, 16, 32, and 64 (which have default values 0 and manipulate exact integer values between 0 and
 2"(<sup> (<var> 'X))"-1 inclusive),
-"(<code> "f"(<var> 'X)"-storage-class")" for "(<code>(<var> 'X))"= 8, 16, 32, and 64 (which have default value 0.0 and manipulate 8-, 16-, 32-, and 64-bit floating-point numbers), and
+"(<code> "f"(<var> 'X)"-storage-class")" for "(<code>(<var> 'X))"= 16, 32, and 64 (which have default value 0.0 and manipulate 16-, 32-, and 64-bit floating-point numbers), and
 "(<code> "c"(<var> 'X)"-storage-class")" for "(<code>(<var> 'X))"= 64 and 128 (which have default value 0.0+0.0i and manipulate complex numbers with, respectively, 32- and 64-bit floating-point numbers as real and imaginary parts).")
 (<p> "Implementations with an appropriate homogeneous vector type should define the associated global variable using "(<code>'make-storage-class)".  Otherwise, they shall define the associated global variable to "(<code>'#f)".")
 

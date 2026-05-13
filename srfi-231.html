@@ -918,7 +918,7 @@
       2<sup><var>X</var>-1</sup>-1 inclusive),
        <code>u<var>X</var>-storage-class</code> for <code><var>X</var></code>=1, 8, 16, 32, and 64 (which have default values 0 and manipulate exact integer values between 0 and
       2<sup><var>X</var></sup>-1 inclusive),
-      <code>f<var>X</var>-storage-class</code> for <code><var>X</var></code>= 8, 16, 32, and 64 (which have default value 0.0 and manipulate 8-, 16-, 32-, and 64-bit floating-point numbers), and
+      <code>f<var>X</var>-storage-class</code> for <code><var>X</var></code>= 16, 32, and 64 (which have default value 0.0 and manipulate 16-, 32-, and 64-bit floating-point numbers), and
       <code>c<var>X</var>-storage-class</code> for <code><var>X</var></code>= 64 and 128 (which have default value 0.0+0.0i and manipulate complex numbers with, respectively, 32- and 64-bit floating-point numbers as real and imaginary parts).</p>
     <p>Implementations with an appropriate homogeneous vector type should define the associated global variable using <code>make-storage-class</code>.  Otherwise, they shall define the associated global variable to <code>#f</code>.</p>
     <h2><a id="Arrays">Arrays</a></h2>
