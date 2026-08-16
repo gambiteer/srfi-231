@@ -623,20 +623,24 @@ OTHER DEALINGS IN THE SOFTWARE.
           (else
            (%%interval-rebase interval new-lower-bounds))))))
 
-(define (%%interval-rebase interval
-                           #!optional
-                           (new-lower-bounds
-                            (%%allocate-zero-vector
-                             (%%interval-dimension interval))))
-  (let ((lower-bounds (%%interval-lower-bounds interval))
-        (upper-bounds (%%interval-upper-bounds interval)))
-    (%%finish-interval new-lower-bounds
-                       (vector-map (lambda (u l new-l)
-                                     (- (+ u new-l)
-                                        l))
-                                   upper-bounds
-                                   lower-bounds
-                                   new-lower-bounds))))
+(define %%interval-rebase
+  (let ()
+
+    (define (do-it interval new-lower-bounds)
+      (let ((lower-bounds (%%interval-lower-bounds interval))
+            (upper-bounds (%%interval-upper-bounds interval)))
+        (%%finish-interval new-lower-bounds
+                           (vector-map (lambda (u l new-l)
+                                         (- (+ u new-l)
+                                            l))
+                                       upper-bounds
+                                       lower-bounds
+                                       new-lower-bounds))))
+    (case-lambda
+     ((interval)
+      (do-it interval (%%allocate-zero-vector (%%interval-dimension interval))))
+     ((interval new-lower-bounds)
+      (do-it interval (vector-copy new-lower-bounds))))))
 
 (define (%%interval-scale interval scales)
   (let* ((uppers (%%interval-upper-bounds interval))

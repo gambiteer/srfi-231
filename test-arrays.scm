@@ -3252,7 +3252,8 @@ OTHER DEALINGS IN THE SOFTWARE.
          (new-lower-bounds (list->vector (map (lambda (x)
                                                 (random -10 10))
                                               (local-iota 0 (vector-length lower-bounds)))))
-         (translation (vector-map - new-lower-bounds lower-bounds)))
+         (translation (vector-map - new-lower-bounds lower-bounds))
+         (rebased-interval (interval-rebase int new-lower-bounds)))
     (test (interval= (interval-rebase int new-lower-bounds)
                      (make-interval (vector-map + lower-bounds translation)
                                     (vector-map + upper-bounds translation)))
@@ -3260,7 +3261,14 @@ OTHER DEALINGS IN THE SOFTWARE.
     (test (interval= (interval-rebase int)
                      (make-interval (make-vector (vector-length lower-bounds) 0)
                                     (vector-map - upper-bounds lower-bounds)))
-          #t)))
+          #t)
+    (if (positive? (vector-length lower-bounds))
+        (begin
+          (vector-set! new-lower-bounds 0 100)
+          (test (interval= rebased-interval
+                           (make-interval (vector-map + lower-bounds translation)
+                                          (vector-map + upper-bounds translation)))
+                #t)))))
 
 (next-test-random-source-state!)
 

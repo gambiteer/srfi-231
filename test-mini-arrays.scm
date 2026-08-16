@@ -3287,21 +3287,31 @@ OTHER DEALINGS IN THE SOFTWARE.
          (new-lower-bounds (list->vector (map (lambda (x)
                                                 (random -10 10))
                                               (local-iota 0 (vector-length lower-bounds)))))
-         (translation (vector-map - new-lower-bounds lower-bounds)))
-    #;(pp (list int
-    new-lower-bounds
-    translation
-    (interval-rebase int new-lower-bounds)
-    (make-interval (vector-map + lower-bounds translation)
-    (vector-map + upper-bounds translation))))
-    (test (interval= (interval-rebase int new-lower-bounds)
+         (translation (vector-map - new-lower-bounds lower-bounds))
+         (rebased-interval (interval-rebase int new-lower-bounds)))
+    #;
+    (pp (list int
+              new-lower-bounds
+              translation
+              rebased-interval
+              (make-interval (vector-map + lower-bounds translation)
+                             (vector-map + upper-bounds translation))))
+    (test (interval= rebased-interval
                      (make-interval (vector-map + lower-bounds translation)
                                     (vector-map + upper-bounds translation)))
           #t)
     (test (interval= (interval-rebase int)
-                     (make-interval (make-vector (vector-length lower-bounds) 0)
-                                    (vector-map - upper-bounds lower-bounds)))
-          #t)))
+                     (make-interval (vector-map - upper-bounds lower-bounds)))
+          #t)
+    (if (positive? (vector-length lower-bounds))
+        (begin
+          (vector-set! new-lower-bounds 0 100)
+          #; (pp (list new-lower-bounds rebased-interval))
+          (test (interval= rebased-interval
+                           (make-interval (vector-map + lower-bounds translation)
+                                          (vector-map + upper-bounds translation)))
+                #t)))
+    ))
 
 (next-test-random-source-state!)
 
