@@ -2567,7 +2567,7 @@ insert axis 2:
     (lambda ("(<var>"a b")")
       (array-reduce "(<var>'f)" (array-map "(<var>"g a b")")))
     (array-copy (array-curry "(<var>'A)" 1))
-    (array-copy (array-curry (array-permute "(<var>'B)" (index-last (array-dimension "(<var>'B)") 0)))))
+    (array-copy (array-curry (array-permute "(<var>'B)" (index-last (array-dimension "(<var>'B)") 0)) 1)))
    "(<cv>'storage-class)"
    "(<cv>'mutable?)"))"))
 

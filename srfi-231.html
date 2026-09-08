@@ -2140,7 +2140,7 @@ insert axis 2:
     (lambda (<var>a b</var>)
       (array-reduce <var>f</var> (array-map <var>g a b</var>)))
     (array-copy (array-curry <var>A</var> 1))
-    (array-copy (array-curry (array-permute <var>B</var> (index-last (array-dimension <var>B</var>) 0)))))
+    (array-copy (array-curry (array-permute <var>B</var> (index-last (array-dimension <var>B</var>) 0)) 1)))
    <code><var>storage-class</var></code>
    <code><var>mutable?</var></code>))</code></pre>
     <p>It is an error if the arguments do not satisfy these constraints.</p>
