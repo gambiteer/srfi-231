@@ -5309,22 +5309,22 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; tests with intervals
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) (make-interval '#(6)))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) (make-interval '#(3 2)))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #t #f)) (make-interval '#(6)))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #t #t)) (make-interval '#(3 2)))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t)) '#(1 1 2 1)) (make-interval '#(4)))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 4 1)) list)) '#(#f #f #t #t)) '#(1 1 2 1)) (make-interval '#(4)))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test (array? (specialized-array-reshape (make-specialized-array (make-interval '#(1 2 0 4)))
                                          (make-interval '#(2 0 4))))
@@ -5333,22 +5333,22 @@ OTHER DEALINGS IN THE SOFTWARE.
 ;;; tests with specifiers
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) '#(6))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#t #f #f #f)) '#(3 2))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #t #f)) '#(6))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #t #t)) '#(3 2))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 3 1)) list)) '#(#f #f #f #t)) '#(1 1 2 1)) '#(4))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test-error (specialized-array-reshape (array-sample (array-reverse (array-copy (make-array (make-interval '#(2 1 4 1)) list)) '#(#f #f #t #t)) '#(1 1 2 1)) '#(4))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (test (array? (specialized-array-reshape (make-specialized-array (make-interval '#(1 2 0 4)))
                                          '#(2 0 4)))
@@ -6088,7 +6088,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 (array-display B)
 
 (test-error (array-display (specialized-array-reshape B (make-interval '#(8))))
-            "specialized-array-reshape: Requested reshaping is impossible: ")
+            "specialized-array-reshape: Cannot reshape array to new domain without copying: ")
 
 (array-display (specialized-array-reshape B (make-interval '#(8)) #t))
 
@@ -7399,5 +7399,70 @@ OTHER DEALINGS IN THE SOFTWARE.
       (begin
         (set! call-cont #f)
         (cont 4))))
+
+;;; tests adapted from the example I sent to kaappi
+
+(pp "continuation tests of some combiners")
+
+(define (re-entry-results-2 collect)
+  (let* ((cont1 #f)
+         (cont2 #f)
+         (i 5)
+         (first-run? #t)
+         (f (lambda args
+              (call-with-current-continuation
+               (lambda (c)
+                 (if first-run?
+                     (cond ((equal? args '(0 1 0))
+                            (set! cont1 c))
+                           ((equal? args '(1 1 0))
+                            (set! cont2 c))
+                           (else
+                            #f)))
+                 args))))
+         (results '()))
+    (let ((r (collect f)))
+      (set! first-run? #f)
+      (set! results (cons r results)))
+    (case i
+      ((5) (set! i (- i 1)) (cont1 10))
+      ((4) (set! i (- i 1)) (cont1 20))
+      ((3) (set! i (- i 1)) (cont2 10))
+      ((2) (set! i (- i 1)) (cont2 20))
+      (else #t))
+    results))
+
+(define (over-f-2 f) (make-array (make-interval '#(2 2 2)) f))
+
+(define re-entry-expected-2
+  '(((0 0 0) (0 0 1) (0 1 0) (0 1 1) (1 0 0) (1 0 1) 20 (1 1 1))
+    ((0 0 0) (0 0 1) (0 1 0) (0 1 1) (1 0 0) (1 0 1) 10 (1 1 1))
+    ((0 0 0) (0 0 1) 20 (0 1 1) (1 0 0) (1 0 1) (1 1 0) (1 1 1))
+    ((0 0 0) (0 0 1) 10 (0 1 1) (1 0 0) (1 0 1) (1 1 0) (1 1 1))
+    ((0 0 0) (0 0 1) (0 1 0) (0 1 1) (1 0 0) (1 0 1) (1 1 0) (1 1 1))))
+
+
+(pp "array-fold-left")
+
+(test re-entry-expected-2
+      (re-entry-results-2 (lambda (f)
+                            (reverse (array-fold-left (lambda (acc x) (cons x acc))
+                                                      '()
+                                                      (over-f-2 f))))))
+
+(pp "array-fold-right")
+
+(test re-entry-expected-2
+      (re-entry-results-2 (lambda (f) (array-fold-right cons '() (over-f-2 f)))))
+
+(pp "array->list")
+
+(test re-entry-expected-2
+      (re-entry-results-2 (lambda (f) (array->list (over-f-2 f)))))
+
+(pp "array->vector")
+
+(test (map list->vector re-entry-expected-2)
+      (re-entry-results-2 (lambda (f) (array->vector (over-f-2 f)))))
 
 (for-each display (list "Failed " failed-tests " out of " total-tests " total tests.\n"))
