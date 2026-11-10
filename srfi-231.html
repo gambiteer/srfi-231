@@ -1348,9 +1348,9 @@ indexer:       (lambda multi-index
                        (apply <var>new-domain-&gt;old-domain</var>
                               multi-index))
                    (array-indexer <var>array</var>)))</code></pre>
-    <p>The resulting array inherits its and mutability from <code><var>array</var></code>.</p>
+    <p>The resulting array inherits its mutability from <code><var>array</var></code>.</p>
     <p>Because <code><var>new-domain-&gt;old-domain</var></code> is assumed to be a one-to-one mapping, the volume of <code><var>new-domain</var></code> must be no greater than the number of elements of <code><var>array</var></code>.</p>
-    <p>Note: It is assumed that the affine structure of the composition of <code><var>new-domain-&gt;old-domain</var></code> and <code>(array-indexer <var>array</var>)</code> will be used to simplify:</p>
+    <p>It is assumed that the affine structure of the composition of <code><var>new-domain-&gt;old-domain</var></code> and <code>(array-indexer <var>array</var>)</code> will be used to simplify:</p>
     <pre><code>  (lambda multi-index
     (call-with-values
         (lambda ()
@@ -1358,6 +1358,7 @@ indexer:       (lambda multi-index
       (array-indexer <var>array</var>)))</code></pre>
     <p>It is an error if <code><var>array</var></code> is not a specialized array, or if <code><var>new-domain</var></code> is not an interval, or if <code><var>new-domain-&gt;old-domain</var></code> is not a one-to-one affine mapping from <code><var>new-domain</var></code> to
       <code>(array-domain <var>array</var>)</code>.</p>
+    <p><b>Note: </b>The problem of determining whether the mapping <code><var>new-domain-&gt;old-domain</var></code> is one-to-one on <code><var>new-domain</var></code> is NP-hard; NumPy has a <a href="https://github.com/numpy/numpy/blob/b92fa9da0b7b2bc650d9298085876fc8db28df5e/numpy/_core/src/common/mem_overlap.c">procedure</a> that attempts to give an answer in a bounded number of steps. The sample implementation of this SRFI makes no attempt to check that <code><var>new-domain-&gt;old-domain</var></code> is one-to-one.</p>
     <p><b>Example: </b>One can apply a &quot;shearing&quot; operation to an array as follows: </p>
     <pre><code>(define a
   (array-copy

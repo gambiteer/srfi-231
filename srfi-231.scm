@@ -1678,11 +1678,11 @@ indexer:       (lambda multi-index
                               multi-index))
                    (array-indexer "(<var> 'array)")))"))
 
-(<p> "The resulting array inherits its and mutability from "(<code>(<var>'array))".")
+(<p> "The resulting array inherits its mutability from "(<code>(<var>'array))".")
 
 (<p> "Because "(<code>(<var>'new-domain->old-domain))" is assumed to be a one-to-one mapping, the volume of "(<code>(<var>'new-domain))" must be no greater than the number of elements of "(<code>(<var>'array))".")
 
-(<p> "Note: It is assumed that the affine structure of the composition of "(<code>(<var> 'new-domain->old-domain))" and "(<code>"(array-indexer "(<var> 'array)")")" will be used to simplify:")
+(<p> "It is assumed that the affine structure of the composition of "(<code>(<var> 'new-domain->old-domain))" and "(<code>"(array-indexer "(<var> 'array)")")" will be used to simplify:")
 (<pre>
  (<code>
 "  (lambda multi-index
@@ -1693,6 +1693,8 @@ indexer:       (lambda multi-index
       ))
 (<p> "It is an error if "(<code>(<var>'array))" is not a specialized array, or if "(<code>(<var>'new-domain))" is not an interval, or if "(<code>(<var>'new-domain->old-domain))" is not a one-to-one affine mapping from "(<code>(<var> 'new-domain))" to
 "(<code>"(array-domain "(<var> 'array)")")".")
+
+(<p>(<b>"Note: ")"The problem of determining whether the mapping "(<cv>'new-domain->old-domain)" is one-to-one on "(<cv>'new-domain)" is NP-hard; NumPy has a "(<a> href: "https://github.com/numpy/numpy/blob/b92fa9da0b7b2bc650d9298085876fc8db28df5e/numpy/_core/src/common/mem_overlap.c" "procedure")" that attempts to give an answer in a bounded number of steps. The sample implementation of this SRFI makes no attempt to check that "(<cv>'new-domain->old-domain)" is one-to-one.")
 
 (<p> (<b> "Example: ")
      "One can apply a \"shearing\" operation to an array as follows: ")
